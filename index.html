@@ -379,7 +379,7 @@ function vDash(){
   const alerts=vaxAlerts();
   const low=lowFeed();
   const kg=s=>s>=2000?(s/2000).toFixed(2)+" 吨":s>=1000?(s/1000).toFixed(1)+" 千斤":fmt(s)+" 斤";
-  const stockRows=Object.entries(S.feedStock).filter(([k,v])=>v!==0).map(([k,v])=>`<tr><td>${k}</td><td class="money ${v<=100?'neg':''}">${kg(v)}</td></tr>`).join("")||`<tr><td class="empty">暂无库存记录, 去「饲料物料」进货</td></tr>`;
+  const stockRows=Object.entries(S.feedStock).filter(([k,v])=>v!==0).map(([k,v])=>{const bags=Math.round(v/(bagKgOf(k)*2)*10)/10;return `<tr><td>${k}</td><td class="money ${v<=100?'neg':''}">${kg(v)}</td><td class="money ${v<0?'neg':''}">${bags}包</td></tr>`}).join("")||`<tr><td class="empty" colspan="3">暂无库存记录, 去「饲料物料」进货</td></tr>`;
   const alertHtml=alerts.length?alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="w"?"过期未免":"即将到期"}</span> ${a.txt} <a href="#" onclick="go('vax');return false" style="color:#B87A10;font-size:13px">去记录 →</a></div>`).join(""):`<div class="empty">✅ 近7天无疫苗待办</div>`;
   const tSale=monthSum(S.sales,"date",salesAmt,today());
   const tEggs=S.sales.filter(r=>r.date===today()).reduce((a,r)=>a+ +r.qty,0);
@@ -404,7 +404,7 @@ function vDash(){
     ${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl==="w"?"r":"w"}">${a.lvl==="w"?"过期":"疫苗"}</span> ${a.txt}</div>`).join("")}
   </section>`:""}
   <section class="panel"><h2>🌾 饲料库存</h2>
-    <table><tr><th>物料</th><th>当前库存</th></tr>${stockRows}</table>
+    <table><tr><th>物料</th><th>当前库存</th><th>折包</th></tr>${stockRows}</table>
   </section>
   <section class="panel"><h2>🥚 本月销售明细</h2>${salesTable(m,true)}</section>`;
 }
