@@ -1,0 +1,23 @@
+{
+  "name": "蛋小固 · 蛋鸡场管家",
+  "short_name": "蛋小固",
+  "description": "蛋鸡养殖记账与免疫管理",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F6F1E7",
+  "theme_color": "#4A2F12",
+  "icons": [
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
