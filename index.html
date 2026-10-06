@@ -409,7 +409,7 @@ function vFeed(){
   <div class="hint">入库自动加库存; 出库自动减库存。若同时填了单价和金额, 记得在「收支台账」补一笔支出。</div></section>
   <section class="panel"><h2>📦 当前库存</h2>
   <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:8px"><div class="field" style="margin:0"><label>每包重量(kg)</label><input type="number" step="0.1" min="0.1" id="bagkg_in" value="${bagKg()}" style="width:90px"></div><button type="button" class="mini" onclick="setBagKg()">保存包重</button><span class="hint" style="align-self:center">这是默认包重; 各物料以包入库时会记住自己的包重(选包时填), 库存折包各按各的算</span></div>
-  <table><tr><th>物料</th><th>库存(折算斤)</th><th>折包</th></tr>${Object.keys(S.feedStock).length?Object.keys(S.feedStock).map(k=>`<tr><td>${k}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${fmt(S.feedStock[k])}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${Math.round(S.feedStock[k]/(bagKgOf(k)*2)*10)/10}包<small style="color:#888">(${bagKgOf(k)}kg)</small></td></tr>`).join(""):`<tr><td class="empty">暂无</td></tr>`}</table><div class="hint">入库支持 斤 / 公斤 / 吨 / 包(50kg), 账本统一按斤累计, 「折包」按1包=${bagKg()}kg=${bagKg()*2}斤换算(包重可在上方改)。</div></section>
+  <table><tr><th>物料</th><th>库存(折算斤)</th><th>折包</th></tr>${Object.keys(S.feedStock).length?Object.keys(S.feedStock).map(k=>`<tr><td>${k}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${fmt(S.feedStock[k])}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${Math.round(S.feedStock[k]/(bagKgOf(k)*2)*10)/10}包<small style="color:#888">(${bagKgOf(k)}kg)</small></td></tr>`).join(""):`<tr><td class="empty">暂无</td></tr>`}</table><div class="hint">入库支持 斤 / 公斤 / 吨 / 包(选包时填每包重量, App替每种物料记住)。账本统一按斤累计。</div></section>
   <section class="panel"><h2>📋 出入库流水</h2>${feedTable()}</section>`;
 }
 function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有记录</div>`;
