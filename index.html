@@ -362,9 +362,21 @@ function vFlock(){
   <div class="hint">当前存栏 = 各次变动相加。死淘、出售都填负数; 存栏显示在「总览」。</div></section>
   <section class="panel"><h2>📋 变动流水</h2>${flockTable()}</section>`;
 }
+function editFlockRow(id){
+  const r=S.flock.find(x=>x.id===id);if(!r)return;
+  const nd=prompt("日期",r.date);if(nd===null)return;const date=nd.trim()||r.date;
+  const nt=prompt("类型: 进雏/上鸡, 死淘, 淘汰鸡出售, 转入, 转出",r.type);if(nt===null)return;const type=nt.trim()||r.type;
+  const nh=prompt("鸡舍/批次",r.house);if(nh===null)return;const house=nh.trim()||r.house;
+  const nq=prompt("数量(+进/-出)",r.qty);if(nq===null)return;const qty=+nq;if(!(qty!==0)){alert("数量不能为0");return}
+  const nn=prompt("备注",r.note||"");if(nn===null)return;
+  r.date=date;r.type=type;r.house=house;r.qty=qty;r.note=nn.trim();
+  touchSave();syncMsg(`✅ 已改: ${date} ${house} ${type} ${qty>0?"+":""}${qty} 只(存栏现为 ${stockCount()})`);
+  render()}
 function flockTable(){if(!S.flock.length)return `<div class="empty">还没有记录</div>`;
-  const rows=[...S.flock].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.type}</td><td>${r.house}</td><td class="money ${r.qty<0?'neg':'pos'}">${r.qty>0?"+":""}${r.qty}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('flock','${r.id}')">删</button></td></tr>`).join("");
-  return `<table><tr><th>日期</th><th>类型</th><th>鸡舍</th><th>数量</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="3"><b>当前存栏合计</b></td><td class="money"><b>${stockCount()}</b></td><td colspan="2"></td></tr></table>`}
+  const rows=[...S.flock].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.type}</td><td>${r.house}</td><td class="money ${r.qty<0?'neg':'pos'}">${r.qty>0?"+":""}${r.qty}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFlockRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('flock','${r.id}')">删</button></td></tr>`).join("");
+  const houses={};S.flock.forEach(r=>{houses[r.house]=r2((houses[r.house]||0)+r.qty)});
+  const houseRows=Object.entries(houses).filter(([h,v])=>v!==0).sort((a,b)=>b[1]-a[1]).map(([h,v])=>`<tr><td>${h}</td><td class="money ${v<0?'neg':''}">${v} 只</td></tr>`).join("");
+  return `<table><tr><th>日期</th><th>类型</th><th>鸡舍</th><th>数量</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="3"><b>各舍存栏 / 合计</b></td><td class="money"><b>${stockCount()}</b></td><td colspan="2"></td></tr>${houseRows?`<tr><td colspan="3" style="color:#888">— 分舍明细 —</td></tr>${houseRows}`:""}</table>`}
 
 function vFeed(){
   const R=recipeGet();const stock=stockCount();
@@ -444,7 +456,20 @@ function vFin(){
   <div class="hint">本月: 收入 <b class="pos">¥${fmt(inc)}</b> / 支出 <b class="neg">¥${fmt(exp)}</b> / 结余 <b class="money">¥${fmt(r2(inc-exp))}</b></div></section>`;
 }
 function syncFinItems(cat){const sel=document.getElementById('fin_item');if(!sel)return;const opts=FIN_ITEMS[cat]||["其他"];sel.innerHTML=opts.map(o=>`<option>${o}</option>`).join('')+`<option value="__custom__">✏️ 自定义…</option>`;const c=sel.nextElementSibling;c.style.display='none';c.required=false;c.value=''}
-function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span></td><td>${r.cat}</td><td>${r.item||"—"}</td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`).join("");
+function editFinRow(id){
+  const r=S.finance.find(x=>x.id===id);if(!r)return;
+  const nd=prompt("日期",r.date);if(nd===null)return;const date=nd.trim()||r.date;
+  const nk=prompt("收 / 支",r.kind);if(nk===null)return;const kind=nk.trim().startsWith("收")?"收":"支";
+  const nc=prompt("类别",r.cat);if(nc===null)return;const cat=nc.trim()||r.cat;
+  const ni=prompt("品名",r.item||"");if(ni===null)return;const item=ni.trim();
+  const na=prompt("金额(元)",r.amount);if(na===null)return;const amount=r2(+na);if(!(amount>0)){alert("金额要大于0");return}
+  const nn=prompt("备注",r.note||"");if(nn===null)return;
+  r.date=date;r.kind=kind;r.cat=cat;r.item=item;r.amount=amount;r.note=nn.trim();
+  touchSave();syncMsg(`✅ 已改: ${date} ${kind} ${item||cat} ¥${fmt(amount)}`);
+  const mv=document.querySelector('#finmonth input[name="m"]');
+  if(mv){const f=document.querySelector('#finmonth')?.closest?.("section")||document;document.getElementById("finmonth").innerHTML=finTable(mv.value||monthOf(today()))}
+  render()}
+function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span></td><td>${r.cat}</td><td>${r.item||"—"}</td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFinRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`).join("");
   return rows?`<table><tr><th>日期</th><th>类型</th><th>类别</th><th>品名</th><th>金额</th><th>备注</th><th></th></tr>${rows}</table>`:`<div class="empty">本月暂无收支记录</div>`}
 function setFinMonth(e){e.preventDefault();document.getElementById("finmonth").innerHTML=finTable(e.target.m.value)}
 
@@ -466,11 +491,23 @@ function vSales(){
   <section class="panel"><h2>📄 销售流水</h2>${salesTable(m,false)}</section>
   <section class="panel"><h2>📊 渠道汇总(本月)</h2>${channelTable(m)}</section>`;
 }
+function editSaleRow(id){
+  const r=S.sales.find(x=>x.id===id);if(!r)return;
+  const nd=prompt("日期",r.date);if(nd===null)return;const date=nd.trim()||r.date;
+  const nc=prompt("渠道: 批发/自提点/抖音/食堂直供/散客/其他",r.channel);if(nc===null)return;const channel=nc.trim()||r.channel;
+  const nq=prompt(`数量(${r.unit})`,r.qty);if(nq===null)return;const qty=+nq;if(!(qty>0)){alert("数量要大于0");return}
+  const np=prompt(`单价(元/${r.unit})`,r.price);if(np===null)return;const price=+np;if(!(price>=0)){alert("单价不能为负");return}
+  const nm=prompt("市场报价(元, 留空清除)",r.mkt||"");if(nm===null)return;const mkt=nm.trim()===""?undefined:+nm;
+  const nb=prompt("买家",r.buyer||"");if(nb===null)return;const buyer=nb.trim();
+  const nn=prompt("备注",r.note||"");if(nn===null)return;const note=nn.trim();
+  r.date=date;r.channel=channel;r.qty=qty;r.price=price;if(mkt)r.mkt=mkt;else delete r.mkt;r.buyer=buyer;r.note=note;
+  touchSave();syncMsg(`✅ 已改: ${date} ${channel} ${qty}${r.unit} ¥${fmt(salesAmt(r))}`);
+  render()}
 function salesTable(m,dashOnly){
   let list=[...S.sales].sort((a,b)=>a.date<b.date?1:-1);
   if(dashOnly)list=list.filter(r=>monthOf(r.date)===m);
   if(!list.length)return `<div class="empty">暂无销售记录</div>`;
-  const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;return `<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money">${r.mkt?`${r.mkt}<small style="color:${diff>=0?"#2E7D32":"#B3261E"}">(${diff>=0?"+":""}${diff})</small>`:""}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
+  const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;return `<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money">${r.mkt?`${r.mkt}<small style="color:${diff>=0?"#2E7D32":"#B3261E"}">(${diff>=0?"+":""}${diff})</small>`:""}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editSaleRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
   const tot=list.reduce((a,r)=>a+salesAmt(r),0);
   return `<table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>市场报价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="5"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table>`}
 function channelTable(m){const t={};S.sales.filter(r=>monthOf(r.date)===m).forEach(r=>{t[r.channel]=t[r.channel]||{amt:0,qty:0};t[r.channel].amt+=salesAmt(r);t[r.channel].qty+=+r.qty});
@@ -494,8 +531,20 @@ function vVax(){
   ${alerts.length?`<section class="panel"><h2>⏰ 待办</h2>${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="w"?"过期":"7天内"}</span> ${a.txt}</div>`).join("")}</section>`:""}
   <section class="panel"><h2>📋 免疫档案</h2>${vaxTable()}</section>`;
 }
+function editVaxRow(id){
+  const r=S.vaccines.find(x=>x.id===id);if(!r)return;
+  const nd=prompt("日期",r.date);if(nd===null)return;const date=nd.trim()||r.date;
+  const nn=prompt("疫苗名",r.name);if(nn===null)return;const name=nn.trim()||r.name;
+  const nh=prompt("鸡舍",r.house);if(nh===null)return;const house=nh.trim()||r.house;
+  const nds=prompt("剂量",r.dose||"");if(nds===null)return;const dose=nds.trim();
+  const nw=prompt("途径: 饮水/点眼/滴鼻/注射/喷雾",r.way||"");if(nw===null)return;const way=nw.trim()||r.way;
+  const nx=prompt("下次免疫日(留空清除)",r.next||"");if(nx===null)return;const next=nx.trim();
+  const nnote=prompt("备注",r.note||"");if(nnote===null)return;const note=nnote.trim();
+  r.date=date;r.name=name;r.house=house;r.dose=dose;r.way=way;r.next=next||undefined;r.note=note;
+  touchSave();syncMsg(`✅ 已改: ${date} ${name} ${house}`);
+  render()}
 function vaxTable(){if(!S.vaccines.length)return `<div class="empty">还没有免疫记录</div>`;
-  const rows=[...S.vaccines].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td>${r.house}</td><td>${r.dose||""}</td><td>${r.way}</td><td>${r.next?`<span class="tag ${r.next<today()?'w':(Math.round((new Date(r.next)-new Date())/864e5)<=7?'s':'ok')}">${r.next}</span>`:"—"}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('vaccines','${r.id}')">删</button></td></tr>`).join("");
+  const rows=[...S.vaccines].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td>${r.house}</td><td>${r.dose||""}</td><td>${r.way}</td><td>${r.next?`<span class="tag ${r.next<today()?'w':(Math.round((new Date(r.next)-new Date())/864e5)<=7?'s':'ok')}">${r.next}</span>`:"—"}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editVaxRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('vaccines','${r.id}')">删</button></td></tr>`).join("");
   return `<table><tr><th>日期</th><th>疫苗</th><th>鸡舍</th><th>剂量</th><th>方式</th><th>下次</th><th>备注</th><th></th></tr>${rows}</table>`}
 
 function vPlan(){
