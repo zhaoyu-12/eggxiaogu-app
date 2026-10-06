@@ -917,8 +917,21 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   render()}
 function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount)});touchSave();render()}
 function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();render()}
-function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();render()}
-function delRow(arr,id){if(!confirm("删除这条记录?"))return;S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
+function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();
+  if(S.plan&&S.plan.start&&d.name){ // 与计划项同名且日期吻合 → 自动勾掉计划进度
+    const hit=planAll().find(it=>it.name===d.name.trim()&&addDays(S.plan.start,it.d)===d.date);
+    if(hit){S.plan.done=S.plan.done||[];const k=String(hit.cid||hit.d);if(!S.plan.done.includes(k)){S.plan.done.push(k);touchSave()}}
+  }
+  render()}
+function delRow(arr,id){if(!confirm("删除这条记录?"))return;
+  if(arr==="vaccines"){ // 删免疫流水时, 若它源自计划表, 同步撤销计划进度
+    const rec=(S.vaccines||[]).find(r=>r.id===id);
+    if(rec&&S.plan&&S.plan.start&&(rec.note||"").indexOf("免疫")>=0){
+      const hit=planAll().find(it=>it.name===rec.name&&addDays(S.plan.start,it.d)===rec.date);
+      if(hit){const k=String(hit.cid||hit.d);S.plan.done=(S.plan.done||[]).map(String).filter(x=>x!==k)}
+    }
+  }
+  S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
 function editFeedRow(id){ // 出入库流水行内编辑: 库存先按旧账回冲, 存好再按新账重扣
   const r=S.feedLog.find(x=>x.id===id);if(!r)return;
   const ni=prompt("物料名",r.item);if(ni===null)return;const item=ni.trim();if(!item)return;
