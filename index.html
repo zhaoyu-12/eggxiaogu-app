@@ -152,11 +152,11 @@ const NOTES={
   vax:["免疫顺利","轻微应激","延后补免","停水2h后饮水","同日带鸡消毒"]
 };
 // 智能选择字段: 下拉选常用 + "✏️自定义"弹出输入框
-function smartField(name,opts,id){
-  return `<select name="${name}" ${id?`id="${id}" `:''}onchange="customToggle(this)">
+function smartField(name,opts,id,oninput){
+  return `<select name="${name}" ${id?`id="${id}" `:''}onchange="customToggle(this);${oninput?oninput:''}">
     ${opts.map(o=>`<option>${o}</option>`).join('')}
     <option value="__custom__">✏️ 自定义…</option></select>
-    <input name="${name}_c" placeholder="输入自定义内容" style="display:none;min-width:130px">`;
+    <input name="${name}_c" placeholder="输入自定义内容" style="display:none;min-width:130px" ${oninput?`oninput="${oninput}"`:''}>`;
 }
 function customToggle(sel){const c=sel.nextElementSibling;if(sel.value==='__custom__'){c.style.display='';c.required=true;c.focus()}else{c.style.display='none';c.required=false;c.value=''}}
 function noteField(key){return smartField('note',NOTES[key])}
@@ -248,7 +248,7 @@ function bagKg(){const v=+S.bagkg;return v>0?v:50} // 默认包重(kg), 新物�
 function bagKgOf(item){const m=(S.bagKgMap||{})[item];return (+m>0)?+m:bagKg()} // 物料自己的包重优先
 function rememberBagKg(item,kg){if(!item||!(kg>0))return;S.bagKgMap=S.bagKgMap||{};S.bagKgMap[item]=kg}
 function feedUnitUI(sel){const f=document.getElementById("bagkg_field");if(f)f.style.display=sel.value==="包"?"":"none";feedItemTip(document.querySelector('input[name="item"]')?.value)}
-function feedItemTip(v){const m=(S.bagKgMap||{})[v];const el=document.getElementById("feed_bagkg");if(m&&el&&(el.value===""||+el.value===bagKg()))el.value=m} // 选老物料自动带出它的包重
+function feedItemTipFromForm(sel){const f=sel.closest("form");const c=f.querySelector('[name="item_c"]');const v=sel.value==="__custom__"?(c&&c.value.trim()||""):sel.value;const m=(S.bagKgMap||{})[v];const el=f.querySelector("#feed_bagkg");if(m>0&&el)el.value=m} // 选物料自动带出记忆包重
 function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
 function salesAmt(r){return r2(r.qty*r.price)}
 function lowFeed(){const R=recipeGet();if(R.total>0&&R.rows.length){const ia=invAlerts().filter(a=>a.lvl==="r").map(a=>a.txt.split(" ")[0]);if(ia.length)return ia}return Object.entries(S.feedStock).filter(([k,v])=>v<=100).map(([k])=>k)}
@@ -395,10 +395,9 @@ function vFeed(){
   return recipeHtml+`<section class="panel"><h2>➕ 物料出入库</h2>
   <form onsubmit="addFeed(event)">
     <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
-    <div class="field"><label>物料名</label>${smartField('item',FEED_ITEMS)}</div>
+    <div class="field"><label>物料名</label>${smartField('item',FEED_ITEMS,'','feedItemTipFromForm(this)')}</div>
     <div class="field"><label>方向</label><select name="dir"><option>入库</option><option>出库(饲喂)</option></select></div>
     <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
-    <div class="field"><label>物料</label><input name="item" list="feed_items_dl" placeholder="如 玉米" required oninput="feedItemTip(this.value)"></div>
     <div class="field"><label>单位</label><select name="unit" onchange="feedUnitUI(this)">${FEED_UNITS.map(u=>`<option value="${u[0]}">${u[0]}</option>`).join('')}</select></div>
     <div class="field" id="bagkg_field" style="display:none"><label>每包重量(kg)</label><input type="number" step="0.1" min="0.1" name="bagkg" id="feed_bagkg" value="${bagKg()}" placeholder="玉米50/豆粕40各记各的"></div>
     <div class="field"><label>单价(元/斤)</label><input type="number" step="0.01" name="price"></div>
@@ -417,8 +416,12 @@ function stockRowsHTML(){
   return ks.map(k=>{const st=S.feedStock[k],kg=Math.round(st/2*10)/10,bags=Math.round(st/(bagKgOf(k)*2)*10)/10;
     return `<tr><td>${k}</td><td class="money ${st<0?'neg':''}">${fmt(st)}</td><td class="money ${st<0?'neg':''}">${fmt(kg)}</td><td class="money ${st<0?'neg':''}">${bags}包</td><td><small style="color:#888">${bagKgOf(k)}kg/包</small></td></tr>`}).join("")}
 function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有记录</div>`;
-  const rows=[...S.feedLog].sort((a,b)=>a.date<b.date?1:-1).map(r=>{const jin=r.jin!==undefined?r.jin:(+r.qty);const unit=r.unit||"斤";return `<tr><td>${r.date}</td><td>${r.item}</td><td>${r.dir}</td><td class="money">${r.dir.startsWith("出")?"-":"+"}${fmt(r.qty)}${unit}</td><td>${r.price?r.price+"元/斤":""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`}).join("");
-  return `<table><tr><th>日期</th><th>物料</th><th>方向</th><th>数量</th><th>单价</th><th>备注</th><th></th></tr>${rows}</table>`}
+  const list=[...S.feedLog].sort((a,b)=>a.date<b.date?1:-1);
+  let cur=null,out=[],ind=0,oud=0;
+  list.forEach(r=>{const j=r.jin!==undefined?r.jin:(+r.qty);const isOut=r.dir.startsWith("出");if(isOut)oud+=j;else ind+=j;
+    if(r.date!==cur){out.push(`<tr style="background:#F0E9DC"><td colspan="5"><b>${r.date}</b></td></tr>`);cur=r.date}
+    out.push(`<tr><td>${r.item}</td><td style="color:${isOut?"#B3261E":"#2E7D32"}">${isOut?"出":"入"}</td><td class="money">${isOut?"−":"+"}${fmt(r.qty)} ${r.unit||"斤"}<small style="color:#888"> ${fmt(j)}斤</small></td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`)});
+  return `<table><tr><th>物料</th><th></th><th>数量</th><th>备注</th><th></th></tr>${out.join("")}<tr style="background:#F0E9DC"><td colspan="2"><b>累计</b></td><td class="money"><b style="color:#2E7D32">入${fmt(ind)}斤</b> <b style="color:#B3261E">出${fmt(oud)}斤</b></td><td colspan="2"></td></tr></table><div class="hint">按日期分块, 绿入红出, 小字为折算斤。</div>`}
 
 function vFin(){
   const m=monthOf(today());
@@ -787,7 +790,22 @@ function vBak(){
 // ================= 增删 =================
 function fd(f){const o={};new FormData(f).forEach((v,k)=>{if(k.endsWith("_c"))return;o[k]=typeof v==="string"?v.trim():v});f.querySelectorAll("select").forEach(s=>{if(s.value==="__custom__"){const c=f.querySelector(`[name="${s.name}_c"]`);o[s.name]=c&&c.value.trim()?c.value.trim():""}delete o[s.name+"_c"]});return o}
 function addFlock(e){e.preventDefault();const d=fd(e.target);S.flock.push({id:uid(),...d,qty:+d.qty});touchSave();render()}
-function addFeed(e){e.preventDefault();const d=fd(e.target);const u=FEED_UNITS.find(x=>x[0]===d.unit);const jin=(d.unit==="包")?r2(+d.qty*bagKg()*2):r2(+d.qty*(u?u[1]:1));const out=d.dir.startsWith("出");S.feedStock[d.item]=(S.feedStock[d.item]||0)+(out?-jin:jin);if(S.feedStock[d.item]<0&&!confirm(`${d.item}库存将变为${S.feedStock[d.item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[d.item]+=out?jin:-jin;return}S.feedLog.push({id:uid(),date:d.date,item:d.item,dir:d.dir,qty:+d.qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${kgo}kg, `:"")+(d.note||"")});touchSave();render()}
+function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
+  const sel=f.querySelector('select[name="item"]');const c=f.querySelector('[name="item_c"]');
+  const item=(sel&&sel.value==="__custom__")?(c&&c.value.trim()||""):(sel&&sel.value||""); // smartField取真名
+  if(!item){alert("请填写物料名");return}
+  const qty=+d.qty;if(!(qty>0)){alert("数量要大于0");return}
+  const kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);
+  const jin=(d.unit==="包")?r2(qty*kgo*2):r2(qty*(FEED_UNITS.find(x=>x[0]===d.unit)||[0,1])[1]);
+  if(d.unit==="包")rememberBagKg(item,kgo);
+  const out=d.dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(out?-jin:jin));
+  if(S.feedStock[item]<0&&!confirm(`${item}库存将变为${S.feedStock[item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[item]=r2(S.feedStock[item]+(out?jin:-jin));return}
+  S.feedLog.push({id:uid(),date:d.date,item,dir:d.dir,qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${kgo}kg`:"")+(d.note?" "+d.note:"")});
+  touchSave();
+  syncMsg(`✅ 已记账: ${d.date} ${item} ${out?"出":"入"}库 ${qty}${d.unit}(${fmt(jin)}斤)${d.unit==="包"?`, 每包${kgo}kg`:""}`);
+  f.reset();f.querySelector('[name="date"]').value=today();
+  const bg=f.querySelector("#bagkg_field");if(bg)bg.style.display="none";
+  render()}
 function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount)});touchSave();render()}
 function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();render()}
 function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();render()}
