@@ -287,12 +287,15 @@ function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当
     S.feedStock[row.item]=r2((S.feedStock[row.item]||0)-jin);
     S.feedLog.push({id:uid(),date:day,item:row.item,dir:"出库(饲喂)",qty:jin,unit:"斤",jin,auto:true,note:tag})});
   S.consume[day]=true;touchSave();return true}
+function healBad(){ // 撤销"无鸡日"的自动消耗并回收库存(开机与每次云合并后都要跑, 防云端还魂)
+  const bad=S.feedLog.filter(r=>r.auto&&stockOn(r.date)<=0);
+  if(!bad.length)return 0;
+  bad.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
+  const bd=new Set(bad.map(r=>r.date));S.feedLog=S.feedLog.filter(r=>!(r.auto&&bd.has(r.date)));
+  bd.forEach(ds=>{delete S.consume[ds]});return bad.length}
 function backfillConsume(){ // 启动时补齐上次用到今天的每日消耗(每次打开最多补7天, 再久提示手动核)
+  healBad();
   const R=recipeGet();if(!S.recipe||!R.enabled||!(R.total>0)||!R.rows.length)return;
-  const bad=S.feedLog.filter(r=>r.auto&&stockOn(r.date)<=0); // 自愈: 撤销"无鸡日"的自动消耗(旧版误补的)
-  if(bad.length){bad.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
-    const bd=new Set(bad.map(r=>r.date));S.feedLog=S.feedLog.filter(r=>!(r.auto&&bd.has(r.date)));
-    bd.forEach(ds=>{delete S.consume[ds]})}
   const days=[];const d=new Date();
   for(let i=0;i<7;i++){const ds=d.toISOString().slice(0,10);if(!S.consume[ds])days.push(ds);d.setDate(d.getDate()-1)}
   days.reverse().forEach(day=>consumeDay(day,false))}
@@ -714,6 +717,7 @@ async function doPush(isAuto){ // 上传(自动/手动共用): 先拉云端合�
 async function autoPull(){ // 打开App时自动收: 拉云端→按id合并→若并了新记录则重算库存→再回推
   const pw=S.sync.pw||"";if(!pw)return;
   const r=await mergePull(pw);
+  if(healBad()>0)save(); // 云端合并可能带回旧误账, 合并后立即再清一次
   if(r&&r.merged>0){recalcStockFromLog();save();
     LAST_SYNC_MSG=`☁️ 自动同步: 从云端并入 ${r.merged} 笔记录(已重算库存)`;LAST_SYNC_ERR=false;
     const el=document.getElementById("sync_msg");if(el)el.innerHTML=`<div class="hint" style="color:#2E7D32">${LAST_SYNC_MSG}</div>`;
