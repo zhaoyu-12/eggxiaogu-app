@@ -355,7 +355,8 @@ function vFeed(){
   const inv=feedInv();const ia=invAlerts();
   const dc=x=>x.days===null?"":x.days<0?`<span class="tag r">已透支</span>`:x.days<=3?`<span class="tag r">仅够${x.days<1?"不足1":x.days}天</span>`:x.days<=7?`<span class="tag w">约${x.days}天</span>`:`<span style="color:#2E7D32;font-size:12px">够${x.days}天</span>`;
   const invRows=inv.map(x=>{
-    return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
+    const bags=Math.round(x.st/100*10)/10;
+    return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.st>=0?bags+"包":""}</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
   const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包数" style="width:56px"></td><td style="white-space:nowrap"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="50" style="width:52px">kg</td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${r.pct===""?"":Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
   const recipeHtml=`
   <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
@@ -373,7 +374,7 @@ function vFeed(){
   <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空按50算), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天)。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
   <section class="panel"><h2>📊 库存盘查(入库 − 消耗 = 现有)</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
-    <table><tr><th>品种</th><th>现有库存</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
+    <table><tr><th>品种</th><th>现有库存</th><th>折包</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
     <div class="hint">黄牌=够吃7天内, 红牌=3天内, 该备料了。库存为负=漏记入库。</div></section>`;
   return recipeHtml+`<section class="panel"><h2>➕ 物料出入库</h2>
   <form onsubmit="addFeed(event)">
@@ -387,7 +388,7 @@ function vFeed(){
     <button class="go">记账</button>
   </form>
   <div class="hint">入库自动加库存; 出库自动减库存。若同时填了单价和金额, 记得在「收支台账」补一笔支出。</div></section>
-  <section class="panel"><h2>📦 当前库存</h2><table><tr><th>物料</th><th>库存(折算斤)</th></tr>${Object.keys(S.feedStock).length?Object.keys(S.feedStock).map(k=>`<tr><td>${k}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${fmt(S.feedStock[k])}</td></tr>`).join(""):`<tr><td class="empty">暂无</td></tr>`}</table><div class="hint">入库支持 斤 / 公斤 / 吨 / 包(50kg), 账本统一按斤累计。</div></section>
+  <section class="panel"><h2>📦 当前库存</h2><table><tr><th>物料</th><th>库存(折算斤)</th><th>折包</th></tr>${Object.keys(S.feedStock).length?Object.keys(S.feedStock).map(k=>`<tr><td>${k}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${fmt(S.feedStock[k])}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${Math.round(S.feedStock[k]/100*10)/10}包</td></tr>`).join(""):`<tr><td class="empty">暂无</td></tr>`}</table><div class="hint">入库支持 斤 / 公斤 / 吨 / 包(50kg), 账本统一按斤累计, 「折包」按1包=50kg=100斤换算。</div></section>
   <section class="panel"><h2>📋 出入库流水</h2>${feedTable()}</section>`;
 }
 function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有记录</div>`;
