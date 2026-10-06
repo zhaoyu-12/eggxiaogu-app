@@ -243,6 +243,7 @@ function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRe
 
 // ================= 计算层 =================
 function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
+function stockOn(day){return S.flock.reduce((a,r)=>a+(r.date<=day?+r.qty:0),0)}
 function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
 function salesAmt(r){return r2(r.qty*r.price)}
 function lowFeed(){const R=recipeGet();if(R.total>0&&R.rows.length){const ia=invAlerts().filter(a=>a.lvl==="r").map(a=>a.txt.split(" ")[0]);if(ia.length)return ia}return Object.entries(S.feedStock).filter(([k,v])=>v<=100).map(([k])=>k)}
@@ -270,12 +271,15 @@ function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
 function recipeToggle(){S.recipe.enabled=!S.recipe.enabled;touchSave();render()}
 function runConsume(){ // 手动"记今日消耗"(补记/重记今日; 自动消耗在启动时做)
   const R=recipeGet();if(!R.enabled||!(R.total>0)||!R.rows.length){alert("请先设置配方并启用");return}
+  if(!(stockOn(today())>0)){alert("今日没有存栏(鸡未上或已清栏), 不记饲料消耗");return}
   consumeDay(today(),true);render()}
 function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当日已有则跳过, force 则先撤旧)
   const R=recipeGet();if(!(R.total>0)||!R.rows.length)return false;
+  const st=stockOn(day); // 当天存栏(此日前所有栏群变动合计)
   const old=S.feedLog.filter(r=>r.auto&&r.date===day);
-  if(old.length){if(!force)return false;old.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
+  if(old.length){old.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
     S.feedLog=S.feedLog.filter(r=>!(r.auto&&r.date===day))}
+  if(!(st>0))return false; // 鸡未上/已清栏: 不记消耗, 不标记(日后补录上鸡会自动再判)
   const tag=`自动消耗 ${day.slice(5).replace("-","/")}`;
   R.rows.forEach(row=>{const jin=r2(R.total*row.pct/100);if(jin<=0)return;
     S.feedStock[row.item]=r2((S.feedStock[row.item]||0)-jin);
@@ -283,6 +287,10 @@ function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当
   S.consume[day]=true;touchSave();return true}
 function backfillConsume(){ // 启动时补齐上次用到今天的每日消耗(每次打开最多补7天, 再久提示手动核)
   const R=recipeGet();if(!S.recipe||!R.enabled||!(R.total>0)||!R.rows.length)return;
+  const bad=S.feedLog.filter(r=>r.auto&&stockOn(r.date)<=0); // 自愈: 撤销"无鸡日"的自动消耗(旧版误补的)
+  if(bad.length){bad.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
+    const bd=new Set(bad.map(r=>r.date));S.feedLog=S.feedLog.filter(r=>!(r.auto&&bd.has(r.date)));
+    bd.forEach(ds=>{delete S.consume[ds]})}
   const days=[];const d=new Date();
   for(let i=0;i<7;i++){const ds=d.toISOString().slice(0,10);if(!S.consume[ds])days.push(ds);d.setDate(d.getDate()-1)}
   days.reverse().forEach(day=>consumeDay(day,false))}
@@ -371,7 +379,7 @@ function vFeed(){
     <datalist id="feed_items_dl">${FEED_ITEMS.map(i=>`<option value="${i}">`).join("")}</datalist>
     <button class="go">保存配方</button>
   </form>
-  <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空按50算), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天)。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
+  <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空按50算), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天), 只记有鸡的日子: 当天存栏大于0才记, 上鸡日之前的不会再记。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
   <section class="panel"><h2>📊 库存盘查(入库 − 消耗 = 现有)</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
     <table><tr><th>品种</th><th>现有库存</th><th>折包</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
