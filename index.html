@@ -19,7 +19,7 @@
   }
   *{box-sizing:border-box;margin:0;padding:0}
   html{-webkit-text-size-adjust:100%}
-  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:16px;line-height:1.55}
   /* ---- 顶栏: 咖啡棕渐变 + 琥珀光 ---- */
   header{background:linear-gradient(135deg,#4A2F12 0%,#7A4A16 100%);color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(74,47,18,.25)}
   header .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F5A623,#E8862E);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
@@ -28,13 +28,22 @@
   /* ---- 导航: 横滑药丸 ---- */
   nav{display:flex;gap:7px;padding:11px 14px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   nav::-webkit-scrollbar{display:none}
-  nav button{flex:0 0 auto;border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:8px 15px;border-radius:99px;font-size:14px;cursor:pointer;transition:all .15s}
+  nav button{flex:0 0 auto;border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:10px 17px;border-radius:99px;font-size:15px;cursor:pointer;transition:all .15s}
   nav button.active{background:linear-gradient(135deg,var(--brand2),var(--brand));border-color:transparent;color:#fff;font-weight:600;box-shadow:0 2px 6px rgba(217,122,31,.35)}
   main{padding:14px;max-width:960px;margin:0 auto;padding-bottom:70px}
+  /* ---- 更多页卡片 ---- */
+  .morecard{display:flex;align-items:center;gap:12px;padding:14px 12px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
+  .morecard:last-child{border-bottom:none}
+  .morecard:active{background:var(--brand-soft)}
+  .mc-ico{width:40px;height:40px;border-radius:12px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:22px;flex:0 0 auto}
+  .mc-mid{flex:1;min-width:0}
+  .mc-t{font-size:16px;font-weight:600}
+  .mc-d{font-size:12.5px;color:var(--sub);margin-top:1px}
+  .mc-arrow{font-size:22px;color:var(--sub);font-weight:300}
   /* ---- 数据卡 ---- */
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:14px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 15px;box-shadow:0 1px 4px rgba(90,60,20,.05)}
-  .card .num{font-size:25px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+  .cards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:0 1px 4px rgba(90,60,20,.05)}
+  .card .num{font-size:27px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
   .card .lab{font-size:13px;color:var(--sub);margin-top:2px}
   .card.good .num{color:var(--green)}
   .card.warn{border-color:#F0C9C9;background:var(--red-soft)}
@@ -110,7 +119,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const r2=n=>Math.round(n*100)/100;
 const fmt=n=>{const v=+n;return (v<0?"-":"")+Math.abs(v).toLocaleString("zh-CN",{maximumFractionDigits:2})};
 const monthOf=d=>d.slice(0,7);
-const CN={'flock':'🐔 栏群','feed':'🌾 饲料物料','finance':'💰 收支台账','sales':'🥚 鸡蛋销售','vax':'💉 疫苗防疫','plan':'🗓 免疫计划','stat':'📈 行情','dash':'📊 总览','bak':'💾 备份'};
+const CN={'flock':'🐔 栏群','feed':'🌾 饲料','finance':'💰 收支','sales':'🥚 卖蛋','vax':'💉 防疫','dash':'📊 总览','more':'⋯ 更多'};
 
 // ================= 选项库 =================
 const FEED_ITEMS=["玉米","豆粕","预混料","麦麸","石粉","磷酸氢钙","食盐","多维/维生素","鱼肝油"];
@@ -235,11 +244,11 @@ function bootApp(){backfillConsume();document.getElementById("nav").style.displa
   if(syncOn())setTimeout(()=>{autoPull().catch(e=>console.log("自动同步(收)暂缓:",e.message))},800)}
 
 // ================= 框架 =================
-const TABS=["dash","flock","feed","finance","sales","vax","plan","stat","bak"];
+const TABS=["dash","flock","feed","finance","sales","vax","more"];
 let tab="dash";
 function renderNav(){document.getElementById("nav").innerHTML=TABS.map(t=>`<button class="${t===tab?'active':''}" onclick="go('${t}')">${CN[t]}</button>`).join("")}
 function go(t){tab=t;renderNav();render()}
-function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRecipe(event)"]'))harvestDraft();const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,plan:vPlan,stat:vStat,bak:vBak})[tab]();afterRender()}
+function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRecipe(event)"]'))harvestDraft();const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,more:vMore})[tab]();afterRender()}
 
 // ================= 计算层 =================
 function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
@@ -323,6 +332,16 @@ function planAge(){if(!S.plan||!S.plan.start)return null;return Math.round((new 
 function planDoneCount(){return S.plan&&S.plan.done?S.plan.done.length:0}
 
 // ================= 视图 =================
+function vMore(){
+  const item=(ico,title,desc,tab)=>`<div class="morecard" onclick="go('${tab}')"><div class="mc-ico">${ico}</div><div class="mc-mid"><div class="mc-t">${title}</div><div class="mc-d">${desc}</div></div><div class="mc-arrow">›</div></div>`;
+  return `
+  <section class="panel" style="padding:8px;overflow:hidden">
+    ${item("🗓","免疫计划","15种疫苗日程+自定义, 到期提醒","plan")}
+    ${item("📈","饲料行情","今日蛋价与原料价, 趋势速览","stat")}
+    ${item("💾","备份与同步","导出json / 云同步 / 换机搬家","bak")}
+  </section>
+  <div class="hint" style="text-align:center;margin-top:18px">蛋小固 · 数据存在本机 · 记账后自动上云</div>`;
+}
 function vDash(){
   const m=monthOf(today());
   const stock=stockCount();
@@ -334,16 +353,29 @@ function vDash(){
   const kg=s=>s>=2000?(s/2000).toFixed(2)+" 吨":s>=1000?(s/1000).toFixed(1)+" 千斤":fmt(s)+" 斤";
   const stockRows=Object.entries(S.feedStock).filter(([k,v])=>v!==0).map(([k,v])=>`<tr><td>${k}</td><td class="money ${v<=100?'neg':''}">${kg(v)}</td></tr>`).join("")||`<tr><td class="empty">暂无库存记录, 去「饲料物料」进货</td></tr>`;
   const alertHtml=alerts.length?alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="w"?"过期未免":"即将到期"}</span> ${a.txt} <a href="#" onclick="go('vax');return false" style="color:#B87A10;font-size:13px">去记录 →</a></div>`).join(""):`<div class="empty">✅ 近7天无疫苗待办</div>`;
+  const tSale=monthSum(S.sales,"date",salesAmt,today());
+  const tEggs=S.sales.filter(r=>r.date===today()).reduce((a,r)=>a+ +r.qty,0);
+  const tFin=S.finance.filter(r=>r.date===today());
+  const tInc=tFin.filter(r=>r.kind==="收").reduce((a,r)=>a+r.amount,0);
+  const tExp=tFin.filter(r=>r.kind==="支").reduce((a,r)=>a+r.amount,0);
+  const lastPrice=[...S.sales].sort((a,b)=>a.date<b.date?1:-1)[0];
+  const R=recipeGet();
+  const houseCnt={};S.flock.forEach(r=>{houseCnt[r.house]=(houseCnt[r.house]||0)+r.qty});
+  const hstr=Object.entries(houseCnt).filter(([h,v])=>v>0).map(([h,v])=>`${h} ${v}`).join(" · ");
   return `
   <div class="cards">
-    <div class="card"><div class="num">${fmt(stock)}</div><div class="lab">栏内存栏(只)</div></div>
+    <div class="card"><div class="num">${fmt(stock)}</div><div class="lab">存栏(只)${hstr?`<div style="font-size:11px;margin-top:1px">${hstr}</div>`:""}</div></div>
+    <div class="card ${lastPrice?`good`:""}"><div class="num">${lastPrice?lastPrice.price+"<small style='font-size:13px'>元/"+lastPrice.unit+"</small>":"—"}</div><div class="lab">最近蛋价${lastPrice&&lastPrice.date!==today()?"("+lastPrice.date.slice(5)+")":""}</div></div>
+    <div class="card"><div class="num">${fmt(tEggs)||"<span style='color:#C8B89A'>0</span>"}</div><div class="lab">今日售出(${lastPrice&&lastPrice.unit||"斤"})</div></div>
+    <div class="card ${tInc-tExp<0?'warn':'good'}"><div class="num">¥${fmt(tInc-tExp)}</div><div class="lab">今日结余</div></div>
     <div class="card good"><div class="num">¥${fmt(mInc)}</div><div class="lab">本月收入</div></div>
     <div class="card"><div class="num">¥${fmt(mExp)}</div><div class="lab">本月支出</div></div>
-    <div class="card ${mInc-mExp<0?'warn':'good'}"><div class="num">¥${fmt(r2(mInc-mExp))}</div><div class="lab">本月结余</div></div>
   </div>
-  <section class="panel"><h2>💉 疫苗提醒</h2>${alertHtml}</section>
+  ${(low.length||alerts.length)?`<section class="panel"><h2>⚠️ 今日待办</h2>
+    ${low.length?`<div style="margin:4px 0"><span class="tag w">饲料</span> 该补货: ${low.join("、")}</div>`:""}
+    ${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl==="w"?"r":"w"}">${a.lvl==="w"?"过期":"疫苗"}</span> ${a.txt}</div>`).join("")}
+  </section>`:""}
   <section class="panel"><h2>🌾 饲料库存</h2>
-    ${low.length?`<div style="margin-bottom:6px"><span class="tag w">需补货</span> ${low.join("、")}</div>`:""}
     <table><tr><th>物料</th><th>当前库存</th></tr>${stockRows}</table>
   </section>
   <section class="panel"><h2>🥚 本月销售明细</h2>${salesTable(m,true)}</section>`;
