@@ -1,1 +1,1 @@
-const CACHE="eggxiaogu-v17";
+const CACHE="eggxiaogu-v18";
