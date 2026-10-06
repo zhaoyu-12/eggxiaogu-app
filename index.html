@@ -63,8 +63,8 @@
   button.mini{background:#fff;border:1.5px solid var(--line);color:var(--sub);font-size:13px;padding:5px 11px;border-radius:9px;cursor:pointer}
   /* ---- 表格 ---- */
   table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
-  .panel{overflow-x:auto}
-  table{min-width:560px}
+  .scrollx{overflow-x:auto}
+  .scrollx table{min-width:640px}
   th{background:var(--th);color:var(--sub);font-weight:600;padding:8px 9px;text-align:left;white-space:nowrap;border-radius:0}
   td{padding:8px 9px;border-top:1px solid #F3EADA}
   tbody tr:nth-child(even) td{background:#FCF9F2}
@@ -529,7 +529,7 @@ function editFinRow(id){
   if(mv){const f=document.querySelector('#finmonth')?.closest?.("section")||document;document.getElementById("finmonth").innerHTML=finTable(mv.value||monthOf(today()))}
   render()}
 function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span></td><td>${r.cat}</td><td>${r.item||"—"}</td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFinRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`).join("");
-  return rows?`<table><tr><th>日期</th><th>类型</th><th>类别</th><th>品名</th><th>金额</th><th>备注</th><th></th></tr>${rows}</table>`:`<div class="empty">本月暂无收支记录</div>`}
+  return rows?`<div class="scrollx"><table><tr><th>日期</th><th>类型</th><th>类别</th><th>品名</th><th>金额</th><th>备注</th><th></th></tr>${rows}</table></div>`:`<div class="empty">本月暂无收支记录</div>`}
 function setFinMonth(e){e.preventDefault();document.getElementById("finmonth").innerHTML=finTable(e.target.m.value)}
 
 function vSales(){
@@ -568,7 +568,7 @@ function salesTable(m,dashOnly){
   if(!list.length)return `<div class="empty">暂无销售记录</div>`;
   const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;return `<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money">${r.mkt?`${r.mkt}<small style="color:${diff>=0?"#2E7D32":"#B3261E"}">(${diff>=0?"+":""}${diff})</small>`:""}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editSaleRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
   const tot=list.reduce((a,r)=>a+salesAmt(r),0);
-  return `<table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>市场报价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="5"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table>`}
+  return `<div class="scrollx"><table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>市场报价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="5"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table></div>`}
 function channelTable(m){const t={};S.sales.filter(r=>monthOf(r.date)===m).forEach(r=>{t[r.channel]=t[r.channel]||{amt:0,qty:0};t[r.channel].amt+=salesAmt(r);t[r.channel].qty+=+r.qty});
   if(!Object.keys(t).length)return `<div class="empty">本月暂无数据</div>`;
   return `<table><tr><th>渠道</th><th>销量</th><th>销售额</th><th>占比</th></tr>${Object.entries(t).sort((a,b)=>b[1].amt-a[1].amt).map(([k,v])=>{const tot=Object.values(t).reduce((a,x)=>a+x.amt,0);return `<tr><td>${k}</td><td class="money">${fmt(r2(v.qty))}</td><td class="money pos">¥${fmt(r2(v.amt))}</td><td class="money">${Math.round(v.amt/tot*100)}%</td></tr>`}).join("")}</table>`}
@@ -604,7 +604,7 @@ function editVaxRow(id){
   render()}
 function vaxTable(){if(!S.vaccines.length)return `<div class="empty">还没有免疫记录</div>`;
   const rows=[...S.vaccines].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td>${r.house}</td><td>${r.dose||""}</td><td>${r.way}</td><td>${r.next?`<span class="tag ${r.next<today()?'w':(Math.round((new Date(r.next)-new Date())/864e5)<=7?'s':'ok')}">${r.next}</span>`:"—"}</td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editVaxRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('vaccines','${r.id}')">删</button></td></tr>`).join("");
-  return `<table><tr><th>日期</th><th>疫苗</th><th>鸡舍</th><th>剂量</th><th>方式</th><th>下次</th><th>备注</th><th></th></tr>${rows}</table>`}
+  return `<div class="scrollx"><table><tr><th>日期</th><th>疫苗</th><th>鸡舍</th><th>剂量</th><th>方式</th><th>下次</th><th>备注</th><th></th></tr>${rows}</table></div>`}
 
 function vPlan(){
   const started=!!(S.plan&&S.plan.start);
