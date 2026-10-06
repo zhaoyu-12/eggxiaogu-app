@@ -254,9 +254,13 @@ let RECIPE_DRAFT=null;
 function draftRows(){if(!RECIPE_DRAFT)RECIPE_DRAFT=(S.recipe&&S.recipe.rows.length?[...S.recipe.rows.map(r=>({...r}))]:[{item:"",pct:""},{item:"",pct:""},{item:"",pct:""}]).slice(0,12);return RECIPE_DRAFT}
 function recipeAddRow(){const d=draftRows();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
 function recipeDelRow(i){const d=draftRows();d.splice(i,1);render()}
+function pctFill(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;const d=fd(f);let wsum=0;const w=[];for(let i=0;i<12;i++){const b=+d["rb"+i]||0,k=+d["rk"+i]||50;w.push(b*k);wsum+=b*k}
+  if(!(wsum>0)){alert("先在各行填包数(千克/包留空默认50)");return}
+  f.querySelectorAll('[name^="rp"]').forEach((el,i)=>{if(w[i]!==undefined)el.value=Math.round(w[i]/wsum*1000)/10});}
 function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
   if(!(t>0)){alert("每日总耗料要大于0");return}
-  const rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i];if(it&&pc>0)rows.push({item:it,pct:pc})}
+  let rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||0;if(it&&pc>0)rows.push({item:it,pct:pc,b:b||undefined,k:b?(k||50):undefined})}
+  if(!rows.length){let wsum=0;const tmp=[];for(let i=0;i<12;i++){const it=d["ri"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||50;if(it&&b>0){const w=b*k;tmp.push({item:it,w,b,k});wsum+=w}}if(wsum>0)tmp.forEach(x=>rows.push({item:x.item,pct:r2(x.w/wsum*100),b:x.b,k:x.k}))}
   const sum=rows.reduce((a,r)=>a+r.pct,0);
   if(!rows.length){alert("至少填一行品种");return}
   if(Math.abs(sum-100)>0.5&&!confirm(`品种占比合计 ${sum}%, 不是100%, 仍要保存吗?(系统会按比例折算)`))return;
@@ -351,21 +355,21 @@ function vFeed(){
   const dc=x=>x.days===null?"":x.days<0?`<span class="tag r">已透支</span>`:x.days<=3?`<span class="tag r">仅够${x.days<1?"不足1":x.days}天</span>`:x.days<=7?`<span class="tag w">约${x.days}天</span>`:`<span style="color:#2E7D32;font-size:12px">够${x.days}天</span>`;
   const invRows=inv.map(x=>{
     return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
-  const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
+  const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包数" style="width:56px"></td><td style="white-space:nowrap"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="50" style="width:52px">kg</td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
   const recipeHtml=`
   <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
   ${R.total>0?`<div style="margin-bottom:8px"><span class="tag ${R.enabled?'s':'w'}">${R.enabled?"● 启用中":"⏸ 已停用"}</span> 每日 <b>${fmt(R.total)}</b> 斤${R.per?` · 折合 <b>${R.per}</b> 两/只·天(存栏${fmt(stock)}只)`:""} <button class="mini" onclick="recipeToggle()">${R.enabled?"停用":"启用"}</button></div>`:""}
   <form onsubmit="saveRecipe(event)">
     <div class="field"><label>每日总耗料(斤)</label><input type="number" step="0.01" name="total" value="${R.total||""}" placeholder="如 2200" required></div>
     <div class="field"><label>每只日耗(两/只, 可不填)</label><input type="number" step="0.01" name="per" value="${R.per||""}" placeholder="如 2.2, 填了只作参考显示"></div>
-    <table style="margin:4px 0"><tr><th>品种</th><th>占比</th></tr>
+    <table style="margin:4px 0"><tr><th>品种</th><th>包数</th><th>千克/包</th><th>占比%</th></tr>
       ${rRows}
     </table>
-    <button type="button" class="mini" onclick="recipeAddRow()">➕ 加一个品种</button>
+    <button type="button" class="mini" onclick="pctFill()">⚖️ 按包数折算占比</button> <button type="button" class="mini" onclick="recipeAddRow()">➕ 加一个品种</button>
     <datalist id="feed_items_dl">${FEED_ITEMS.map(i=>`<option value="${i}">`).join("")}</datalist>
     <button class="go">保存配方</button>
   </form>
-  <div class="hint">品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天)。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
+  <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空按50算), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天)。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
   <section class="panel"><h2>📊 库存盘查(入库 − 消耗 = 现有)</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
     <table><tr><th>品种</th><th>现有库存</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
@@ -423,6 +427,7 @@ function vSales(){
     <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
     <div class="field"><label>单位</label><select name="unit"><option>斤</option><option>枚</option><option>件</option></select></div>
     <div class="field"><label>单价(元)</label><input type="number" step="0.01" name="price" required></div>
+    <div class="field"><label>市场报价(元/件, 可不填)</label><input type="number" step="0.01" name="mkt" placeholder="如 180"></div>
     <div class="field"><label>买家</label><input name="buyer" list="buyerlist" placeholder="选历史或输入">${datalistTag("buyerlist",buyerList())}</div>
     <div class="field"><label>备注</label>${noteField('sales')}</div>
     <button class="go">记账</button>
@@ -435,9 +440,9 @@ function salesTable(m,dashOnly){
   let list=[...S.sales].sort((a,b)=>a.date<b.date?1:-1);
   if(dashOnly)list=list.filter(r=>monthOf(r.date)===m);
   if(!list.length)return `<div class="empty">暂无销售记录</div>`;
-  const rows=list.map(r=>`<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`).join("");
+  const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;return `<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money">${r.mkt?`${r.mkt}<small style="color:${diff>=0?"#2E7D32":"#B3261E"}">(${diff>=0?"+":""}${diff})</small>`:""}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
   const tot=list.reduce((a,r)=>a+salesAmt(r),0);
-  return `<table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="4"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table>`}
+  return `<table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>市场报价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="5"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table>`}
 function channelTable(m){const t={};S.sales.filter(r=>monthOf(r.date)===m).forEach(r=>{t[r.channel]=t[r.channel]||{amt:0,qty:0};t[r.channel].amt+=salesAmt(r);t[r.channel].qty+=+r.qty});
   if(!Object.keys(t).length)return `<div class="empty">本月暂无数据</div>`;
   return `<table><tr><th>渠道</th><th>销量</th><th>销售额</th><th>占比</th></tr>${Object.entries(t).sort((a,b)=>b[1].amt-a[1].amt).map(([k,v])=>{const tot=Object.values(t).reduce((a,x)=>a+x.amt,0);return `<tr><td>${k}</td><td class="money">${fmt(r2(v.qty))}</td><td class="money pos">¥${fmt(r2(v.amt))}</td><td class="money">${Math.round(v.amt/tot*100)}%</td></tr>`}).join("")}</table>`}
@@ -756,7 +761,7 @@ function fd(f){const o={};new FormData(f).forEach((v,k)=>{if(k.endsWith("_c"))re
 function addFlock(e){e.preventDefault();const d=fd(e.target);S.flock.push({id:uid(),...d,qty:+d.qty});touchSave();render()}
 function addFeed(e){e.preventDefault();const d=fd(e.target);const u=FEED_UNITS.find(x=>x[0]===d.unit);const jin=r2(+d.qty*(u?u[1]:1));const out=d.dir.startsWith("出");S.feedStock[d.item]=(S.feedStock[d.item]||0)+(out?-jin:jin);if(S.feedStock[d.item]<0&&!confirm(`${d.item}库存将变为${S.feedStock[d.item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[d.item]+=out?jin:-jin;return}S.feedLog.push({id:uid(),date:d.date,item:d.item,dir:d.dir,qty:+d.qty,unit:d.unit||"斤",jin,price:d.price,note:d.note});touchSave();render()}
 function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount)});touchSave();render()}
-function addSale(e){e.preventDefault();const d=fd(e.target);S.sales.push({id:uid(),...d,qty:+d.qty,price:+d.price});touchSave();render()}
+function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();render()}
 function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();render()}
 function delRow(arr,id){if(!confirm("删除这条记录?"))return;S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
 function exportData(silent){const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`蛋小固管家备份_${today()}.json`;if(silent)return;a.click()}
