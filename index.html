@@ -239,7 +239,7 @@ const TABS=["dash","flock","feed","finance","sales","vax","plan","stat","bak"];
 let tab="dash";
 function renderNav(){document.getElementById("nav").innerHTML=TABS.map(t=>`<button class="${t===tab?'active':''}" onclick="go('${t}')">${CN[t]}</button>`).join("")}
 function go(t){tab=t;renderNav();render()}
-function render(){const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,plan:vPlan,stat:vStat,bak:vBak})[tab]();afterRender()}
+function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRecipe(event)"]'))harvestDraft();const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,plan:vPlan,stat:vStat,bak:vBak})[tab]();afterRender()}
 
 // ================= 计算层 =================
 function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
@@ -252,8 +252,9 @@ function recipeGet(){if(!S.recipe)S.recipe={total:0,rows:[],enabled:true};if(!S.
 // 配方编辑行(编辑期间暂存, 与 S.recipe 分离, 保存才生效)
 let RECIPE_DRAFT=null;
 function draftRows(){if(!RECIPE_DRAFT)RECIPE_DRAFT=(S.recipe&&S.recipe.rows.length?[...S.recipe.rows.map(r=>({...r}))]:[{item:"",pct:""},{item:"",pct:""},{item:"",pct:""}]).slice(0,12);return RECIPE_DRAFT}
-function recipeAddRow(){const d=draftRows();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
-function recipeDelRow(i){const d=draftRows();d.splice(i,1);render()}
+function harvestDraft(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f||!RECIPE_DRAFT)return;const v={};new FormData(f).forEach((x,k)=>v[k]=x);RECIPE_DRAFT.forEach((r,i)=>{r.item=v["ri"+i]||"";r.b=v["rb"+i]||"";r.k=v["rk"+i]||"";r.pct=v["rp"+i]||""})}
+function recipeAddRow(){const d=draftRows();harvestDraft();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
+function recipeDelRow(i){const d=draftRows();harvestDraft();d.splice(i,1);render()}
 function pctFill(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;const d=fd(f);let wsum=0;const w=[];for(let i=0;i<12;i++){const b=+d["rb"+i]||0,k=+d["rk"+i]||50;w.push(b*k);wsum+=b*k}
   if(!(wsum>0)){alert("先在各行填包数(千克/包留空默认50)");return}
   f.querySelectorAll('[name^="rp"]').forEach((el,i)=>{if(w[i]!==undefined)el.value=Math.round(w[i]/wsum*1000)/10});}
@@ -355,7 +356,7 @@ function vFeed(){
   const dc=x=>x.days===null?"":x.days<0?`<span class="tag r">已透支</span>`:x.days<=3?`<span class="tag r">仅够${x.days<1?"不足1":x.days}天</span>`:x.days<=7?`<span class="tag w">约${x.days}天</span>`:`<span style="color:#2E7D32;font-size:12px">够${x.days}天</span>`;
   const invRows=inv.map(x=>{
     return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
-  const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包数" style="width:56px"></td><td style="white-space:nowrap"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="50" style="width:52px">kg</td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
+  const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包数" style="width:56px"></td><td style="white-space:nowrap"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="50" style="width:52px">kg</td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${r.pct===""?"":Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
   const recipeHtml=`
   <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
   ${R.total>0?`<div style="margin-bottom:8px"><span class="tag ${R.enabled?'s':'w'}">${R.enabled?"● 启用中":"⏸ 已停用"}</span> 每日 <b>${fmt(R.total)}</b> 斤${R.per?` · 折合 <b>${R.per}</b> 两/只·天(存栏${fmt(stock)}只)`:""} <button class="mini" onclick="recipeToggle()">${R.enabled?"停用":"启用"}</button></div>`:""}
