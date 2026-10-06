@@ -370,6 +370,29 @@ function moreToggle(key,title){
   ar.textContent="⌄";ar.style.transform="rotate(0)"
 }
 
+function creditList(){ // 全部未平账: [{type,rec,amt,label}] type=sales(应收)|finance(应付)
+  const out=[];
+  S.sales.forEach(r=>{if(r.pay==="credit")out.push({type:"sales",rec:r,amt:salesAmt(r),label:(r.buyer||r.channel)})});
+  S.finance.forEach(r=>{if(r.pay==="credit"&&r.kind==="支")out.push({type:"finance",rec:r,amt:r.amount,label:r.item||r.cat})});
+  return out}
+function settleCredit(type,id){ // 平账: 标记已收/已付, 记平账时间
+  const arr=(type==="sales")?S.sales:S.finance;
+  const r=arr.find(x=>x.id===id);if(!r)return;
+  r.pay="paid";r.settledDate=today();
+  touchSave();syncMsg(`✅ 已平账: ${r.date} ${type==="sales"?"应收":"应付"} ¥${fmt(type==="sales"?salesAmt(r):r.amount)}`);
+  render()}
+function creditHtml(){ // 欠款面板 (总览页嵌入)
+  const list=creditList();
+  if(!list.length)return "";
+  const recv=list.filter(x=>x.type==="sales"),pay=list.filter(x=>x.type==="finance");
+  const rSum=recv.reduce((a,x)=>a+x.amt,0),pSum=pay.reduce((a,x)=>a+x.amt,0);
+  const rows=[...recv.map(x=>({dir:"应收",...x})),...pay.map(x=>({dir:"应付",...x}))]
+    .sort((a,b)=>a.rec.date<b.rec.date?1:-1)
+    .map(x=>`<tr><td><b>${x.label}</b><div style="font-size:11px;color:var(--sub)">${x.rec.date.slice(5)}${x.type==="sales"?(" · "+x.rec.channel+" · "+fmt(x.rec.qty)+x.rec.unit):(" · "+(x.rec.cat||""))}</div></td><td><span class="tag" style="background:#FDEEEE;color:#B3261E">${x.dir}</span></td><td class="money ${x.dir==="应付"?'neg':'pos'}">${x.dir==="应收"?"+":"−"}¥${fmt(x.amt)}</td><td class="row-actions"><button class="go" style="padding:5px 10px;font-size:12px" onclick="settleCredit('${x.type}','${x.rec.id}')">已${x.dir==="应收"?"收":"付"}平账</button></td></tr>`).join("");
+  return `<section class="panel"><h2>⚠️ 赊账待平</h2>
+  <table><tr><th>往来 / 明细</th><th>状态</th><th>金额</th><th></th></tr>${rows}
+  <tr><td><b>合计</b></td><td></td><td class="money"><b style="color:#2E7D32">待收¥${fmt(rSum)}</b> <b style="color:#B3261E">待付¥${fmt(pSum)}</b></td><td></td></tr></table>
+  <div class="hint">收/到款后点「已收/付平账」即销账; 想撤销可在原流水里✏️改。</div></section>`}
 function vDash(){
   const m=monthOf(today());
   const stock=stockCount();
@@ -399,6 +422,7 @@ function vDash(){
     <div class="card good"><div class="num">¥${fmt(mInc)}</div><div class="lab">本月收入</div></div>
     <div class="card"><div class="num">¥${fmt(mExp)}</div><div class="lab">本月支出</div></div>
   </div>
+  ${creditHtml()}
   ${(low.length||alerts.length)?`<section class="panel"><h2>⚠️ 今日待办</h2>
     ${low.length?`<div style="margin:4px 0"><span class="tag w">饲料</span> 该补货: ${low.join("、")}</div>`:""}
     ${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl==="w"?"r":"w"}">${a.lvl==="w"?"过期":"疫苗"}</span> ${a.txt}</div>`).join("")}
@@ -506,6 +530,7 @@ function vFin(){
     <div class="field"><label>类别</label><select name="cat" onchange="syncFinItems(this.value)">${Object.keys(FIN_ITEMS).map(c=>`<option>${c}</option>`).join('')}</select></div>
     <div class="field"><label>品名</label>${smartField('item',FIN_ITEMS["饲料原料"],'fin_item')}</div>
     <div class="field"><label>金额(元)</label><input type="number" step="0.01" name="amount" required></div>
+    <div class="field"><label>付款状态</label><select name="pay"><option value="paid">已付款</option><option value="credit">赊账(未付款)</option></select></div>
     <div class="field"><label>备注</label>${noteField('finance')}</div>
     <button class="go">记</button>
   </form>
@@ -529,7 +554,7 @@ function editFinRow(id){
   const mv=document.querySelector('#finmonth input[name="m"]');
   if(mv){const f=document.querySelector('#finmonth')?.closest?.("section")||document;document.getElementById("finmonth").innerHTML=finTable(mv.value||monthOf(today()))}
   render()}
-function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span> <b>${r.item||r.cat}</b><div style="font-size:11px;color:var(--sub)">${r.date.slice(5)} · ${r.cat}${r.note?" · "+r.note:""}</div></td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td class="row-actions"><button class="mini" onclick="editFinRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`).join("");
+function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>{const credit=r.pay==="credit"&&r.kind==="支";return `<tr><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span> <b>${r.item||r.cat}</b>${credit?` <span class="tag" style="background:#FDEEEE;color:#B3261E">未付</span>`:""}<div style="font-size:11px;color:var(--sub)">${r.date.slice(5)} · ${r.cat}${r.note?" · "+r.note:""}</div></td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td class="row-actions"><button class="mini" onclick="editFinRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`}).join("");
   return rows?`<table><tr><th>项目 / 类别·日期·备注</th><th>金额</th><th></th></tr>${rows}</table>`:`<div class="empty">本月暂无收支记录</div>`}
 function setFinMonth(e){e.preventDefault();document.getElementById("finmonth").innerHTML=finTable(e.target.m.value)}
 
@@ -544,6 +569,7 @@ function vSales(){
     <div class="field"><label>单价(元)</label><input type="number" step="0.01" name="price" required></div>
     <div class="field"><label>市场报价(元/件, 可不填)</label><input type="number" step="0.01" name="mkt" placeholder="如 180"></div>
     <div class="field"><label>买家</label><input name="buyer" list="buyerlist" placeholder="选历史或输入">${datalistTag("buyerlist",buyerList())}</div>
+    <div class="field"><label>收款状态</label><select name="pay"><option value="paid">已收款</option><option value="credit">赊账(未收款)</option></select></div>
     <div class="field"><label>备注</label>${noteField('sales')}</div>
     <button class="go">记账</button>
   </form>
@@ -567,7 +593,7 @@ function salesTable(m,dashOnly){
   let list=[...S.sales].sort((a,b)=>a.date<b.date?1:-1);
   if(dashOnly)list=list.filter(r=>monthOf(r.date)===m);
   if(!list.length)return `<div class="empty">暂无销售记录</div>`;
-  const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;return `<tr><td><b>${r.channel}</b>${r.buyer?`<small style="color:var(--sub)"> · ${r.buyer}</small>`:""}<div style="font-size:11px;color:var(--sub)">${r.date.slice(5)}${r.note?" · "+r.note:""}</div></td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}<small style="color:var(--sub)">/${r.unit}</small>${r.mkt?`<small style="color:${(r.price-r.mkt)>=0?"#2E7D32":"#B3261E"}"> (${r.mkt}${(r.price-r.mkt)>=0?"+":"−"}${Math.abs(diff)})</small>`:""}</td><td class="money pos"><b>¥${fmt(salesAmt(r))}</b></td><td class="row-actions"><button class="mini" onclick="editSaleRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
+  const rows=list.map(r=>{const diff=r.mkt?r2(r.price-r.mkt):null;const credit=r.pay==="credit";return `<tr><td><b>${r.channel}</b>${r.buyer?`<small style="color:var(--sub)"> · ${r.buyer}</small>`:""}${credit?` <span class="tag" style="background:#FDEEEE;color:#B3261E">未收</span>`:""}<div style="font-size:11px;color:var(--sub)">${r.date.slice(5)}${r.note?" · "+r.note:""}</div></td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}<small style="color:var(--sub)">/${r.unit}</small>${r.mkt?`<small style="color:${(r.price-r.mkt)>=0?"#2E7D32":"#B3261E"}"> (${r.mkt}${(r.price-r.mkt)>=0?"+":"−"}${Math.abs(diff)})</small>`:""}</td><td class="money pos"><b>¥${fmt(salesAmt(r))}</b></td><td class="row-actions"><button class="mini" onclick="editSaleRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`}).join("");
   const tot=list.reduce((a,r)=>a+salesAmt(r),0);
   return `<table><tr><th>渠道 / 日期备注</th><th>数量</th><th>单价 (报价)</th><th>金额</th><th></th></tr>${rows}<tr><td colspan="3"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td></td></tr></table>`}
 function channelTable(m){const t={};S.sales.filter(r=>monthOf(r.date)===m).forEach(r=>{t[r.channel]=t[r.channel]||{amt:0,qty:0};t[r.channel].amt+=salesAmt(r);t[r.channel].qty+=+r.qty});
@@ -934,8 +960,10 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   f.reset();f.querySelector('[name="date"]').value=today();
   const bg=f.querySelector("#bagkg_field");if(bg)bg.style.display="none";
   render()}
-function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount)});touchSave();render()}
-function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();render()}
+function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount),pay:d.pay||"paid"});touchSave();render()}
+function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price,pay:d.pay||"paid"};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();
+  if(rec.pay==="credit")syncMsg(`已记账(赊账): ${d.channel} ${rec.qty}${d.unit} ¥${fmt(salesAmt(rec))} — 待收款, 记得去「欠款」页平账`);
+  render()}
 function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();
   if(S.plan&&S.plan.start&&d.name){ // 与计划项同名且日期吻合 → 自动勾掉计划进度
     const hit=planAll().find(it=>it.name===d.name.trim()&&addDays(S.plan.start,it.d)===d.date);
