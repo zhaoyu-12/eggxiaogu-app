@@ -248,7 +248,17 @@ const TABS=["dash","flock","feed","finance","sales","vax","more"];
 let tab="dash";
 function renderNav(){document.getElementById("nav").innerHTML=TABS.map(t=>`<button class="${t===tab?'active':''}" onclick="go('${t}')">${CN[t]}</button>`).join("")}
 function go(t){tab=t;renderNav();render()}
-function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRecipe(event)"]'))harvestDraft();const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,more:vMore})[tab]();afterRender()}
+function render(){if(RECIPE_DRAFT&&document.querySelector('form[onsubmit="saveRecipe(event)"]'))harvestDraft();const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,more:vMore})[tab]();afterRender();
+if(tab==="more"){ // 恢复"更多"页已展开的折叠区 (状态存全局, 不随DOM销毁)
+  window.MORE_OPEN=window.MORE_OPEN||{};
+  ["plan","stat","bak"].forEach(k=>{if(window.MORE_OPEN[k]==="1"){
+    const titles={plan:"🗓 免疫计划",stat:"📈 饲料行情",bak:"💾 备份与同步"};
+    const sec=document.getElementById("sec_"+k);
+    if(sec){sec.innerHTML=`<div style="font-weight:700;margin:10px 0 6px">${titles[k]}</div>`+{plan:vPlan,stat:vStat,bak:vBak}[k]();
+      sec.style.display="";const ar=document.getElementById("ar_"+k);if(ar)ar.textContent="⌄"}}
+  })}
+}
+}
 
 // ================= 计算层 =================
 function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
@@ -344,18 +354,20 @@ function vMore(){
   </section>
   <div class="hint" style="text-align:center;margin-top:18px">蛋小固 · 数据存在本机 · 记账后自动上云</div>`;
 }
+window.MORE_OPEN=window.MORE_OPEN||{};
 function moreToggle(key,title){
   const sec=document.getElementById("sec_"+key);
   const ar=document.getElementById("ar_"+key);
   if(!sec)return;
-  const show=sec.style.display==="none";
-  if(show){
-    const fn={plan:vPlan,stat:vStat,bak:vBak}[key];
-    sec.innerHTML=`<div style="font-weight:700;margin:10px 0 6px">${title}</div>`+fn();
-    sec.style.display="";
-    ar.textContent="⌄";ar.style.transform="rotate(0)"
-  }else{sec.style.display="none";ar.textContent="›"}
+  if(window.MORE_OPEN[key]==="1"){window.MORE_OPEN[key]="0";sec.style.display="none";ar.textContent="›";return}
+  window.MORE_OPEN[key]="1";
+  const fn={plan:vPlan,stat:vStat,bak:vBak}[key];
+  const titles={plan:"🗓 免疫计划",stat:"📈 饲料行情",bak:"💾 备份与同步"};
+  sec.innerHTML=`<div style="font-weight:700;margin:10px 0 6px">${titles[key]}</div>`+fn();
+  sec.style.display="";
+  ar.textContent="⌄";ar.style.transform="rotate(0)"
 }
+
 function vDash(){
   const m=monthOf(today());
   const stock=stockCount();
