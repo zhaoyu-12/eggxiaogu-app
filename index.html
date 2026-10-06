@@ -266,7 +266,7 @@ function stockOn(day){return S.flock.reduce((a,r)=>a+(r.date<=day?+r.qty:0),0)}
 function bagKg(){const v=+S.bagkg;return v>0?v:50} // 默认包重(kg), 新物料/未记过的用它
 function bagKgOf(item){const m=(S.bagKgMap||{})[item];return (+m>0)?+m:bagKg()} // 物料自己的包重优先
 function rememberBagKg(item,kg){if(!item||!(kg>0))return;S.bagKgMap=S.bagKgMap||{};S.bagKgMap[item]=kg}
-function feedUnitUI(sel){const f=document.getElementById("bagkg_field");if(f)f.style.display=sel.value==="包"?"":"none";feedItemTip(document.querySelector('input[name="item"]')?.value)}
+function feedUnitUI(sel){const f=document.getElementById("bagkg_field");if(f)f.style.display=sel.value==="包"?"":"none";const selItem=document.querySelector('select[name="item"]');if(selItem)feedItemTipFromForm(selItem)}
 function feedItemTipFromForm(sel){const f=sel.closest("form");const c=f.querySelector('[name="item_c"]');const v=sel.value==="__custom__"?(c&&c.value.trim()||""):sel.value;const m=(S.bagKgMap||{})[v];const el=f.querySelector("#feed_bagkg");if(m>0&&el)el.value=m} // 选物料自动带出记忆包重
 function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
 function salesAmt(r){return r2(r.qty*r.price)}
