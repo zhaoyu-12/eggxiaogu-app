@@ -63,6 +63,8 @@
   button.mini{background:#fff;border:1.5px solid var(--line);color:var(--sub);font-size:13px;padding:5px 11px;border-radius:9px;cursor:pointer}
   /* ---- 表格 ---- */
   table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+  .panel{overflow-x:auto}
+  table{min-width:560px}
   th{background:var(--th);color:var(--sub);font-weight:600;padding:8px 9px;text-align:left;white-space:nowrap;border-radius:0}
   td{padding:8px 9px;border-top:1px solid #F3EADA}
   tbody tr:nth-child(even) td{background:#FCF9F2}
@@ -343,13 +345,13 @@ function planDoneCount(){return S.plan&&S.plan.done?S.plan.done.length:0}
 // ================= 视图 =================
 function vMore(){
   return `
-  <section class="panel" style="padding:0;overflow:hidden">
+  <section class="panel" style="padding:0">
     <div class="morecard" onclick="moreToggle('plan','🗓 免疫计划')"><div class="mc-ico">🗓</div><div class="mc-mid"><div class="mc-t">免疫计划</div><div class="mc-d">15种疫苗日程+自定义, 到期提醒</div></div><div class="mc-arrow" id="ar_plan">›</div></div>
-    <div id="sec_plan" style="display:none;padding:0 12px 12px"></div>
+    <div id="sec_plan" style="display:none;padding:0 12px 12px;overflow-x:auto"></div>
     <div class="morecard" onclick="moreToggle('stat','📈 饲料行情')"><div class="mc-ico">📈</div><div class="mc-mid"><div class="mc-t">饲料行情</div><div class="mc-d">今日蛋价与原料价, 趋势速览</div></div><div class="mc-arrow" id="ar_stat">›</div></div>
-    <div id="sec_stat" style="display:none;padding:0 12px 12px"></div>
+    <div id="sec_stat" style="display:none;padding:0 12px 12px;overflow-x:auto"></div>
     <div class="morecard" onclick="moreToggle('bak','💾 备份与同步')"><div class="mc-ico">💾</div><div class="mc-mid"><div class="mc-t">备份与同步</div><div class="mc-d">导出json / 云同步 / 换机搬家</div></div><div class="mc-arrow" id="ar_bak">›</div></div>
-    <div id="sec_bak" style="display:none;padding:0 12px 12px"></div>
+    <div id="sec_bak" style="display:none;padding:0 12px 12px;overflow-x:auto"></div>
   </section>
   <div class="hint" style="text-align:center;margin-top:18px">蛋小固 · 数据存在本机 · 记账后自动上云</div>`;
 }
@@ -622,7 +624,7 @@ function vPlan(){
     const st=done?`<span class="tag ok">已完成</span>`:late?`<span class="tag w">已过期${Math.round((nowTs-dueTs)/864e5)}天</span>`:soon?`<span class="tag s">${Math.ceil((dueTs-nowTs)/864e5)}天后</span>`:`<span class="tag" style="background:#F1EADC;color:#8A7357">待做</span>`;
     const key=it.cid||it.d;
     const delBtn=it.cid?` <button class="mini" style="color:#B3261E;border-color:#B3261E;padding:2px 7px;font-size:11px" onclick="delCustomVax('${it.cid}')">删</button>`:"";
-    return `<tr style="${done?'opacity:.55':''}"><td>${it.d}日龄</td><td>${due}</td><td><b>${it.name}</b>${delBtn}<div style="font-size:12px;color:var(--sub)">${it.note}</div></td><td>${it.way}</td><td>${it.dose}</td><td>${st}</td><td>${done?`<button class="mini" onclick="undoPlan('${key}')">撤销</button>`:`<button class="go" style="padding:5px 12px;font-size:13px" onclick="doPlan('${key}')">已做</button>`}</td></tr>`}).join("");
+    return `<tr style="${done?'opacity:.55':''}"><td>${it.d}日龄<div style="font-size:11px;color:var(--sub)">${due}</div></td><td><b>${it.name}</b>${delBtn}<div style="font-size:11px;color:var(--sub)">${it.way}${it.dose&&it.dose!=="—"?" · "+it.dose:""}</div><div style="font-size:11px;color:#B8860B">${st}</div></td><td style="white-space:nowrap">${done?`<button class="mini" onclick="undoPlan('${key}')">撤销</button>`:`<button class="go" style="padding:6px 14px;font-size:13px" onclick="doPlan('${key}')">已做</button>`}</td></tr>`}).join("");
   const pct=Math.round(doneSet.size/planAll().length*100);
   return `<section class="panel"><h2>🗓 免疫计划进度</h2>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
@@ -633,7 +635,7 @@ function vPlan(){
     </div>
     <div class="hint">点「已做」自动把这次免疫写进档案(日期=计划日, 鸡舍=计划鸡舍), 并在计划里打勾。提前或延后做的, 去「疫苗防疫」页手动登记, 再回来点已做即可。</div></section>
   <section class="panel"><h2>📋 全流程日程表 (0-119日龄)</h2>
-  <table><tr><th>日龄</th><th>计划日期</th><th>疫苗/事项</th><th>方式</th><th>剂量</th><th>状态</th><th></th></tr>${rows}</table></section>
+  <table><tr><th>日龄</th><th>疫苗 / 日程 · 状态</th><th>操作</th></tr>${rows}</table></section>
   <section class="panel"><h2>➕ 计划里加一项(自定义疫苗/事项)</h2>
   <form onsubmit="addCustomVax(event)">
     <div style="display:flex;gap:8px;flex-wrap:wrap">
