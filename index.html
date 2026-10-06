@@ -420,7 +420,7 @@ function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有�
   let cur=null,out=[],ind=0,oud=0;
   list.forEach(r=>{const j=r.jin!==undefined?r.jin:(+r.qty);const isOut=r.dir.startsWith("出");if(isOut)oud+=j;else ind+=j;
     if(r.date!==cur){out.push(`<tr style="background:#F0E9DC"><td colspan="5"><b>${r.date}</b></td></tr>`);cur=r.date}
-    out.push(`<tr><td>${r.item}</td><td style="color:${isOut?"#B3261E":"#2E7D32"}">${isOut?"出":"入"}</td><td class="money">${isOut?"−":"+"}${fmt(r.qty)} ${r.unit||"斤"}<small style="color:#888"> ${fmt(j)}斤</small></td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`)});
+    out.push(`<tr><td>${r.item}</td><td style="color:${isOut?"#B3261E":"#2E7D32"}">${isOut?"出":"入"}</td><td class="money">${isOut?"−":"+"}${fmt(r.qty)} ${r.unit||"斤"}<small style="color:#888"> ${fmt(j)}斤</small></td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFeedRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`)});
   return `<table><tr><th>物料</th><th></th><th>数量</th><th>备注</th><th></th></tr>${out.join("")}<tr style="background:#F0E9DC"><td colspan="2"><b>累计</b></td><td class="money"><b style="color:#2E7D32">入${fmt(ind)}斤</b> <b style="color:#B3261E">出${fmt(oud)}斤</b></td><td colspan="2"></td></tr></table><div class="hint">按日期分块, 绿入红出, 小字为折算斤。</div>`}
 
 function vFin(){
@@ -810,6 +810,20 @@ function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:ui
 function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();render()}
 function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();render()}
 function delRow(arr,id){if(!confirm("删除这条记录?"))return;S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
+function editFeedRow(id){ // 出入库流水行内编辑: 库存先按旧账回冲, 存好再按新账重扣
+  const r=S.feedLog.find(x=>x.id===id);if(!r)return;
+  const ni=prompt("物料名",r.item);if(ni===null)return;const item=ni.trim();if(!item)return;
+  const nd=prompt("方向: 入库 / 出库(饲喂)",r.dir);if(nd===null)return;const dir=nd.trim()||r.dir;
+  const nq=prompt(`数量(${r.unit||"斤"})`,r.qty);if(nq===null)return;const qty=+nq;if(!(qty>0)){alert("数量要大于0");return}
+  let unit=r.unit||"斤";
+  if(unit==="包"){const nk=prompt("每包重量(kg)",(S.bagKgMap||{})[item]||bagKg());if(nk===null)return;const kg=+nk;if(!(kg>0)){alert("包重要大于0");return}rememberBagKg(item,kg)}
+  const jin=(unit==="包")?r2(qty*((S.bagKgMap||{})[item]||bagKg())*2):r2(qty*(FEED_UNITS.find(x=>x[0]===unit)||[0,1])[1]);
+  const oldJin=r.jin!==undefined?r.jin:(+r.qty);const wasOut=(r.dir||"").startsWith("出");
+  S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+(wasOut?oldJin:-oldJin)); // 回冲旧账
+  const isOut=dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(isOut?-jin:jin)); // 记新账
+  r.item=item;r.dir=dir;r.qty=qty;r.unit=unit;r.jin=jin;
+  touchSave();syncMsg(`✅ 已改: ${r.date} ${item} ${isOut?"出":"入"}库 ${qty}${unit}(${fmt(jin)}斤)`);
+  render()}
 function exportData(silent){const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`蛋小固管家备份_${today()}.json`;if(silent)return;a.click()}
 function importData(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!confirm("导入将覆盖当前数据, 继续?"))return;S=Object.assign(JSON.parse(JSON.stringify(EMPTY)),d);save();location.reload()}catch(err){alert("文件不是有效备份: "+err.message)}};rd.readAsText(f)}
 function afterRender(){}
