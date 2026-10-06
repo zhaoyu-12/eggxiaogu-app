@@ -1,0 +1,774 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4A2F12">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="蛋小固">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<title>蛋小固 · 蛋鸡场管家</title>
+<style>
+  :root{
+    --bg:#F6F1E7; --card:#FFFFFF; --ink:#3D2B12; --sub:#8A7357;
+    --line:#EADFCB; --brand:#D97A1F; --brand2:#F0A63C; --brand-soft:#FBF0DC;
+    --green:#2E8B57; --red:#CC4B4B; --red-soft:#FDEEEE; --th:#F8F0DE;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5}
+  /* ---- 顶栏: 咖啡棕渐变 + 琥珀光 ---- */
+  header{background:linear-gradient(135deg,#4A2F12 0%,#7A4A16 100%);color:#fff;padding:16px 18px;display:flex;align-items:center;gap:12px;box-shadow:0 2px 8px rgba(74,47,18,.25)}
+  header .logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,#F5A623,#E8862E);display:flex;align-items:center;justify-content:center;font-size:26px;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+  header h1{font-size:20px;font-weight:700;letter-spacing:.5px}
+  header .sub{font-size:12px;opacity:.85;margin-top:1px}
+  /* ---- 导航: 横滑药丸 ---- */
+  nav{display:flex;gap:7px;padding:11px 14px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:9;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}
+  nav button{flex:0 0 auto;border:1.5px solid var(--line);background:#fff;color:var(--ink);padding:8px 15px;border-radius:99px;font-size:14px;cursor:pointer;transition:all .15s}
+  nav button.active{background:linear-gradient(135deg,var(--brand2),var(--brand));border-color:transparent;color:#fff;font-weight:600;box-shadow:0 2px 6px rgba(217,122,31,.35)}
+  main{padding:14px;max-width:960px;margin:0 auto;padding-bottom:70px}
+  /* ---- 数据卡 ---- */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:14px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:14px 15px;box-shadow:0 1px 4px rgba(90,60,20,.05)}
+  .card .num{font-size:25px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+  .card .lab{font-size:13px;color:var(--sub);margin-top:2px}
+  .card.good .num{color:var(--green)}
+  .card.warn{border-color:#F0C9C9;background:var(--red-soft)}
+  .card.warn .num{color:var(--red)}
+  /* ---- 面板 ---- */
+  section.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin-bottom:14px;box-shadow:0 1px 4px rgba(90,60,20,.05)}
+  .panel h2{font-size:16px;font-weight:700;margin-bottom:11px;display:flex;align-items:center;gap:6px;letter-spacing:.3px}
+  /* ---- 表单 ---- */
+  form{display:flex;flex-wrap:wrap;gap:9px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:3px;flex:0 1 auto}
+  .field label{font-size:12px;color:var(--sub);font-weight:600}
+  input,select{border:1.5px solid var(--line);border-radius:10px;padding:8px 11px;font-size:15px;background:#FFFDF8;color:var(--ink);min-width:105px;transition:border .15s}
+  input:focus,select:focus{outline:none;border-color:var(--brand2);box-shadow:0 0 0 3px rgba(240,166,60,.15)}
+  input[type=date]{min-width:132px}
+  button.go{background:linear-gradient(135deg,var(--brand2),var(--brand));border:none;color:#fff;font-size:15px;font-weight:600;padding:9px 20px;border-radius:10px;cursor:pointer;box-shadow:0 2px 6px rgba(217,122,31,.3);transition:transform .1s}
+  button.go:active{transform:scale(.96)}
+  button.mini{background:#fff;border:1.5px solid var(--line);color:var(--sub);font-size:13px;padding:5px 11px;border-radius:9px;cursor:pointer}
+  /* ---- 表格 ---- */
+  table{width:100%;border-collapse:collapse;margin-top:10px;font-size:14px}
+  th{background:var(--th);color:var(--sub);font-weight:600;padding:8px 9px;text-align:left;white-space:nowrap;border-radius:0}
+  td{padding:8px 9px;border-top:1px solid #F3EADA}
+  tbody tr:nth-child(even) td{background:#FCF9F2}
+  tr:hover td{background:var(--brand-soft)}
+  .money{font-variant-numeric:tabular-nums;font-weight:600}
+  .neg{color:var(--red)}.pos{color:var(--green)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:500}
+  .tag.w{background:var(--red-soft);color:var(--red)}
+  .tag.s{background:#FFF4DC;color:#B87A10}
+  .tag.ok{background:#EAF6EE;color:var(--green)}
+  .tag.up{background:#EAF6EE;color:var(--green)}
+  .tag.dn{background:var(--red-soft);color:var(--red)}
+  /* ---- 行情图表 ---- */
+  .bigprice{font-size:30px;font-weight:700;color:var(--ink);margin:6px 0 2px}
+  .bigprice small{font-size:14px;color:var(--sub);font-weight:400}
+  .chart{display:flex;align-items:flex-end;gap:6px;height:150px;padding:8px 4px 0;overflow-x:auto}
+  .barwrap{flex:0 0 44px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:40px}
+  .barval{font-size:11px;font-weight:600;color:var(--ink);margin-bottom:3px}
+  .bar{width:26px;border-radius:6px 6px 2px 2px;min-height:18px}
+  .barlab{font-size:10px;color:var(--sub);margin-top:4px;white-space:nowrap}
+  .barn{font-size:9px;color:#C5B79F}
+  button.mini.active{background:var(--brand);border-color:var(--brand);color:#fff}
+  .empty{text-align:center;color:#B49B72;padding:26px 0;font-size:14px}
+  .hint{font-size:12px;color:#A78B5F;margin-top:9px;line-height:1.7}
+  .del{color:#C96A6A;cursor:pointer;font-size:13px;background:none;border:none;text-decoration:underline}
+  .row-actions{white-space:nowrap}
+  @media(max-width:640px){
+    nav button{padding:7px 12px;font-size:13px}
+    .card .num{font-size:21px}
+    table{font-size:12.5px}th,td{padding:6px 5px}
+    input,select{min-width:90px;font-size:15px}
+    .cards{grid-template-columns:1fr 1fr}
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><img src="data:image/jpeg;base64,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" alt="蛋小固" style="width:100%;height:100%;object-fit:cover;border-radius:12px"></div>
+  <div><h1>蛋小固 · 蛋鸡场管家</h1><div class="sub">数据存在本机浏览器 · 定期到「备份」页导出</div></div>
+</header>
+<nav id="nav"></nav>
+<main id="main"></main>
+
+<script>
+"use strict";
+// ================= 数据层 =================
+const KEY="eggxiaogu_data_v1";   // 与旧版同key, 已记数据自动兼容
+const EMPTY={flock:[],feedStock:{},feedLog:[],finance:[],sales:[],vaccines:[],plan:{},auth:{},recipe:null,consume:{},sync:null};
+let S=load();
+function load(){try{const r=localStorage.getItem(KEY);return r?Object.assign(JSON.parse(JSON.stringify(EMPTY)),JSON.parse(r)):JSON.parse(JSON.stringify(EMPTY))}catch(e){return JSON.parse(JSON.stringify(EMPTY))}}
+function save(){localStorage.setItem(KEY,JSON.stringify(S))}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+const today=()=>new Date().toISOString().slice(0,10);
+const r2=n=>Math.round(n*100)/100;
+const fmt=n=>{const v=+n;return (v<0?"-":"")+Math.abs(v).toLocaleString("zh-CN",{maximumFractionDigits:2})};
+const monthOf=d=>d.slice(0,7);
+const CN={'flock':'🐔 栏群','feed':'🌾 饲料物料','finance':'💰 收支台账','sales':'🥚 鸡蛋销售','vax':'💉 疫苗防疫','plan':'🗓 免疫计划','stat':'📈 行情','dash':'📊 总览','bak':'💾 备份'};
+
+// ================= 选项库 =================
+const FEED_ITEMS=["玉米","豆粕","预混料","麦麸","石粉","磷酸氢钙","食盐","多维/维生素","鱼肝油"];
+const FEED_UNITS=[["斤",1],["公斤",2],["吨",2000],["包(50kg)",100]];
+const FIN_ITEMS={
+  "饲料原料":["玉米","豆粕","预混料","麦麸","石粉","磷酸氢钙","多维/维生素","鱼肝油"],
+  "疫苗兽药":["新城疫疫苗","禽流感疫苗","法氏囊疫苗","传支疫苗","鸡痘疫苗","消毒药","驱虫药","抗生素","肠道药"],
+  "人工工资":["饲养员工资","零工","自家人工折算"],
+  "水电":["电费","水费"],
+  "设备维修":["风机维修","水线维修","料线维修","电路维修","灯泡耗材"],
+  "鸡苗/淘鸡":["进雏支出","淘鸡收入","包装耗材"],
+  "其他":["杂费"]
+};
+const VAX_NAMES=["新城疫IV系(Lasota)","新城疫Clone30","禽流感H9油苗","禽流感H5+H7灭活苗","法氏囊B87","传支H120","鸡痘","马立克CVI988","球虫药","肠道药/益生菌"];
+const VAX_DOSE=["1倍量","2倍量","3倍量","0.3ml","0.5ml","1ml"];
+// ---- 全流程免疫计划模板 (商品蛋鸡, 0-119日龄到开产前; 日程供参考, 以当地兽医和疫苗说明书为准) ----
+const VAX_PLAN=[
+ {d:1,   name:"马立克CVI988",        way:"颈部皮下注射", dose:"0.2ml",   note:"孵化厂出壳时打; 多半自带, 核对凭证"},
+ {d:7,   name:"新城疫Clone30+传支H120", way:"点眼滴鼻",   dose:"1倍量",   note:"7日龄首免; 也可用新支二联灭活苗同时皮下注射"},
+ {d:14,  name:"法氏囊B87",            way:"饮水",       dose:"1倍量",   note:"水中无氯, 断水2-3小时后饮"},
+ {d:21,  name:"新城疫IV系(Lasota)",   way:"饮水",       dose:"2倍量",   note:"二免"},
+ {d:24,  name:"法氏囊B87",            way:"饮水",       dose:"1.5倍量", note:"二免"},
+ {d:28,  name:"鸡痘",                way:"翼膜刺种",    dose:"1倍量",   note:"蚊虫季必做"},
+ {d:35,  name:"禽流感H5+H7灭活苗",    way:"皮下注射",    dose:"0.3ml",   note:"国家强制免疫, 留好免疫证明"},
+ {d:42,  name:"新城疫IV系(Lasota)",   way:"饮水",       dose:"2倍量",   note:"三免; 可加传喉视当地疫情"},
+ {d:49,  name:"传染性喉气管炎",       way:"点眼",       dose:"1倍量",   note:"疫区才免, 健康鸡群慎用"},
+ {d:63,  name:"禽流感H5+H7灭活苗",    way:"皮下注射",    dose:"0.5ml",   note:"加强"},
+ {d:70,  name:"新城疫IV系+禽流感H9",  way:"饮水+注射",   dose:"3倍量+0.5ml", note:"产前准备, 饮水与油苗同日分侧"},
+ {d:84,  name:"脑脊髓炎",            way:"饮水",       dose:"1倍量",   note:"疫区或种鸡场建议"},
+ {d:91,  name:"传染性鼻炎",          way:"皮下注射",    dose:"0.5ml",   note:"发病场周边建议"},
+ {d:112, name:"新城疫-禽流感-传支三联油苗", way:"皮下注射", dose:"0.5ml", note:"开产前最后一次大免, 务必完成"},
+ {d:119, name:"驱虫+带鸡消毒",       way:"拌料+喷洒",   dose:"—",      note:"开产前体内外驱虫, 之后进入产蛋期"}
+];
+const NOTES={
+  flock:["正常","弱雏淘汰","疫病死亡","应激/挤压死亡","转群","盘存调整"],
+  feed:["现款采购","赊购月结","新粮上市","价格优惠","自配料用","盘点修正"],
+  finance:["现款","微信/支付宝","银行转账","赊账月结"],
+  sales:["现款","赊账","月结","上门自提","送货上门","含运费"],
+  vax:["免疫顺利","轻微应激","延后补免","停水2h后饮水","同日带鸡消毒"]
+};
+// 智能选择字段: 下拉选常用 + "✏️自定义"弹出输入框
+function smartField(name,opts,id){
+  return `<select name="${name}" ${id?`id="${id}" `:''}onchange="customToggle(this)">
+    ${opts.map(o=>`<option>${o}</option>`).join('')}
+    <option value="__custom__">✏️ 自定义…</option></select>
+    <input name="${name}_c" placeholder="输入自定义内容" style="display:none;min-width:130px">`;
+}
+function customToggle(sel){const c=sel.nextElementSibling;if(sel.value==='__custom__'){c.style.display='';c.required=true;c.focus()}else{c.style.display='none';c.required=false;c.value=''}}
+function noteField(key){return smartField('note',NOTES[key])}
+// 历史 buyer/house 联想
+function uniq(arr){return [...new Set(arr.filter(Boolean))]}
+function houseList(){return uniq([...S.flock.map(r=>r.house),...S.vaccines.map(r=>r.house)])}
+function buyerList(){return uniq(S.sales.map(r=>r.buyer))}
+function datalistTag(id,items){return `<datalist id="${id}">${items.map(i=>`<option>${i}</option>`).join('')}</datalist>`}
+
+// demo 数据 (?demo=1 仅供预览, 不落盘)
+function loadDemo(){
+  S.flock=[{id:uid(),date:"2026-09-01",type:"进雏/上鸡",house:"1号舍",qty:5000,note:"正常"},{id:uid(),date:"2026-09-20",type:"死淘",house:"1号舍",qty:-23,note:"弱雏淘汰"}];
+  S.feedStock={"玉米":3000,"豆粕":800,"预混料":150};
+  S.feedLog=[{id:uid(),date:"2026-06-15",item:"玉米",dir:"入库",qty:6000,unit:"斤",jin:6000,price:"1.42",note:"老粮尾货"},{id:uid(),date:"2026-07-20",item:"玉米",dir:"入库",qty:5000,unit:"斤",jin:5000,price:"1.40",note:"东北粮"},{id:uid(),date:"2026-08-18",item:"玉米",dir:"入库",qty:5000,unit:"斤",jin:5000,price:"1.38",note:"现款采购"},{id:uid(),date:"2026-08-20",item:"豆粕",dir:"入库",qty:2000,unit:"斤",jin:2000,price:"1.85",note:"现货"},{id:uid(),date:"2026-09-05",item:"玉米",dir:"入库",qty:5000,unit:"斤",jin:5000,price:"1.35",note:"新粮上市"},{id:uid(),date:"2026-09-25",item:"豆粕",dir:"入库",qty:2000,unit:"斤",jin:2000,price:"1.78",note:"现货"},{id:uid(),date:"2026-09-30",item:"玉米",dir:"出库(饲喂)",qty:2000,unit:"斤",jin:2000,price:"",note:"现款采购"}];
+  S.sales=[{id:uid(),date:"2026-08-05",channel:"批发",qty:1000,unit:"斤",price:4.6,buyer:"郑州贸易商",note:"现款"},{id:uid(),date:"2026-09-08",channel:"批发",qty:900,unit:"斤",price:4.7,buyer:"郑州贸易商",note:"现款"},{id:uid(),date:"2026-09-20",channel:"自提点",qty:200,unit:"斤",price:5.2,buyer:"阳光小区",note:"现款"},{id:uid(),date:"2026-10-01",channel:"批发",qty:800,unit:"斤",price:4.8,buyer:"郑州贸易商",note:"现款"},{id:uid(),date:"2026-10-02",channel:"自提点",qty:96,unit:"枚",price:1.2,buyer:"阳光小区",note:"现款"}];
+  S.finance=[{id:uid(),date:"2026-10-02",cat:"饲料原料",item:"玉米",kind:"支",amount:6750,note:"赊账月结"},{id:uid(),date:"2026-10-03",cat:"人工工资",item:"饲养员工资",kind:"支",amount:4500,note:"现款"},{id:uid(),date:"2026-10-03",cat:"鸡苗/淘鸡",item:"淘鸡收入",kind:"收",amount:2800,note:"现款"}];
+  S.vaccines=[{id:uid(),date:"2026-09-10",name:"新城疫IV系(Lasota)",house:"1号舍",dose:"2倍量",way:"饮水",next:"2026-10-05",note:"免疫顺利"},{id:uid(),date:"2026-08-15",name:"禽流感H9油苗",house:"1号舍",dose:"0.5ml",way:"注射",next:"2026-10-10",note:"免疫顺利"}];
+}
+if(new URLSearchParams(location.search).get("demo")==="1")loadDemo();
+
+// ================= 登录锁 (SHA-256 本地散列, 无服务器; 支持密保问题找回) =================
+async function sha256(s){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(s.trim().toLowerCase()));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+function loggedIn(){return sessionStorage.getItem("gx_login")==="1"}
+function hasAuth(){return S.auth&&S.auth.hash}
+function hasSecQ(){return hasAuth()&&S.auth.q&&S.auth.a}
+async function tryLogin(e){e.preventDefault();const fd=new FormData(e.target);const pw=fd.get("pw");const h=await sha256(pw);
+  if(hasAuth()){if(h===S.auth.hash){sessionStorage.setItem("gx_login","1");bootApp()}else{document.getElementById("login_err").style.display="";}}
+  else{if(!pw||pw.length<4){document.getElementById("login_err").textContent="密码至少4位";document.getElementById("login_err").style.display="";return}
+    if(pw!==fd.get("pw2")){document.getElementById("login_err").textContent="两次输入不一致";document.getElementById("login_err").style.display="";return}
+    const q=fd.get("secq"),a=fd.get("seca");
+    if(!q||!a||!a.trim()){document.getElementById("login_err").textContent="请设置密保问题和答案(用于忘密码找回)";document.getElementById("login_err").style.display="";return}
+    S.auth={hash:h,set:today(),q,a:await sha256(a)};save();sessionStorage.setItem("gx_login","1");bootApp()}}
+async function recoverPw(e){e.preventDefault();const fd=new FormData(e.target);const a=fd.get("ra");
+  const h=await sha256(a);
+  if(!hasSecQ()||h!==S.auth.a){document.getElementById("rec_err").textContent="答案不对";document.getElementById("rec_err").style.display="";return}
+  const p1=fd.get("np1"),p2=fd.get("np2");
+  if(!p1||p1.length<4){document.getElementById("rec_err").textContent="新密码至少4位";document.getElementById("rec_err").style.display="";return}
+  if(p1!==p2){document.getElementById("rec_err").textContent="两次输入的新密码不一致";document.getElementById("rec_err").style.display="";return}
+  S.auth.hash=await sha256(p1);save();sessionStorage.setItem("gx_login","1");bootApp()}
+function showRecover(){document.getElementById("rec_box").style.display="";document.getElementById("login_err").style.display="none"}
+async function resetPw(){if(!confirm("重置密码会清空全部数据(账本无法恢复), 仅在密保答案也忘了时使用, 确定吗?"))return;if(!confirm("再次确认: 清空全部数据并重设密码?"))return;localStorage.removeItem(KEY);sessionStorage.removeItem("gx_login");location.reload()}
+function lockNow(){sessionStorage.removeItem("gx_login");location.reload()}
+function loginScreen(msg){document.getElementById("main").innerHTML=`<div style="max-width:360px;margin:8vh auto 0">
+  <section class="panel" style="text-align:center;padding:28px 22px">
+    <div style="font-size:44px;margin-bottom:6px"><img src="data:image/jpeg;base64,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" alt="蛋小固" style="width:64px;height:64px;object-fit:cover;border-radius:16px;box-shadow:0 2px 8px rgba(74,47,18,.2)"></div>
+    <h2 style="justify-content:center;margin-bottom:4px">蛋小固 · 蛋鸡场管家</h2>
+    <div style="font-size:13px;color:var(--sub);margin-bottom:16px">${msg||"请输入密码进入"}</div>
+    <form onsubmit="tryLogin(event)" style="flex-direction:column;align-items:stretch;gap:10px">
+      <input type="password" name="pw" id="pw1" placeholder="密码" style="text-align:center;font-size:17px;letter-spacing:2px" required>
+      <input type="password" name="pw2" id="pw2" placeholder="再输一遍(首次设置时)" style="text-align:center;font-size:17px;letter-spacing:2px;display:${hasAuth()?"none":"block"}">
+      ${!hasAuth()?`<select name="secq" style="padding:10px;border:1.5px solid var(--line);border-radius:10px;font-size:15px;background:#fff">
+        <option value="我母亲的姓名">密保: 我母亲的姓名</option>
+        <option value="我出生的村庄">密保: 我出生的村庄</option>
+        <option value="第一辆车的车牌号">密保: 第一辆车的车牌号</option>
+        <option value="最爱吃的一道菜">密保: 最爱吃的一道菜</option>
+        <option value="自定义问题">自定义问题…</option></select>
+      <input name="seca" placeholder="密保答案(忘密码时凭它找回)" style="text-align:center;font-size:15px" required>`:""}
+      <button class="go" style="width:100%">${hasAuth()?"解锁":"设置密码并进入"}</button>
+    </form>
+    <div id="login_err" style="display:none;color:var(--red);font-size:13px;margin-top:8px">密码不对, 再想想</div>
+    <div id="rec_box" style="display:none;margin-top:14px;border-top:1px dashed var(--line);padding-top:12px">
+      <div style="font-size:13px;color:var(--sub);margin-bottom:8px">🔐 ${hasSecQ()?`密保问题: ${S.auth.q}`:"尚未设置密保问题(旧版密码无法找回, 只能重置)"}</div>
+      ${hasSecQ()?`<form onsubmit="recoverPw(event)" style="flex-direction:column;align-items:stretch;gap:8px">
+        <input name="ra" placeholder="密保答案" style="text-align:center;font-size:15px" required>
+        <input type="password" name="np1" placeholder="新密码(至少4位)" style="text-align:center;font-size:15px" required>
+        <input type="password" name="np2" placeholder="再输一遍新密码" style="text-align:center;font-size:15px" required>
+        <button class="go" style="width:100%;background:var(--green)">验证密保, 重设密码</button>
+      </form>`:`<button class="mini" onclick="resetPw()">清空数据并重设密码</button>`}
+      <div id="rec_err" style="display:none;color:var(--red);font-size:13px;margin-top:8px">答案不对</div>
+    </div>
+    ${hasAuth()?`<div style="margin-top:12px"><button class="mini" onclick="showRecover()">忘记密码?</button></div>`:""}
+    <div class="hint" style="text-align:left;margin-top:14px">密码只存本机, 密保答案也只存本机(散列)。${hasAuth()?"忘了密码点「忘记密码」答密保题即可重设, 账本不动。":"密保问题用于日后忘密码找回, 务必填一个忘不了的答案。"}</div>
+  </section></div>`;
+  document.getElementById("nav").style.display="none"}
+function bootApp(){backfillConsume();document.getElementById("nav").style.display="";render();
+  if(syncOn())setTimeout(()=>{autoPull().catch(e=>console.log("自动同步(收)暂缓:",e.message))},800)}
+
+// ================= 框架 =================
+const TABS=["dash","flock","feed","finance","sales","vax","plan","stat","bak"];
+let tab="dash";
+function renderNav(){document.getElementById("nav").innerHTML=TABS.map(t=>`<button class="${t===tab?'active':''}" onclick="go('${t}')">${CN[t]}</button>`).join("")}
+function go(t){tab=t;renderNav();render()}
+function render(){const m=document.getElementById("main");m.innerHTML=({dash:vDash,flock:vFlock,feed:vFeed,finance:vFin,sales:vSales,vax:vVax,plan:vPlan,stat:vStat,bak:vBak})[tab]();afterRender()}
+
+// ================= 计算层 =================
+function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
+function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
+function salesAmt(r){return r2(r.qty*r.price)}
+function lowFeed(){const R=recipeGet();if(R.total>0&&R.rows.length){const ia=invAlerts().filter(a=>a.lvl==="r").map(a=>a.txt.split(" ")[0]);if(ia.length)return ia}return Object.entries(S.feedStock).filter(([k,v])=>v<=100).map(([k])=>k)}
+// ================= 混合料配方 + 每日自动消耗 =================
+// recipe = {total:每日总耗(斤), rows:[{item,pct}], per:每只日耗(两/只, 仅展示), enabled:true}
+function recipeGet(){if(!S.recipe)S.recipe={total:0,rows:[],enabled:true};if(!S.recipe.rows)S.recipe.rows=[];return S.recipe}
+// 配方编辑行(编辑期间暂存, 与 S.recipe 分离, 保存才生效)
+let RECIPE_DRAFT=null;
+function draftRows(){if(!RECIPE_DRAFT)RECIPE_DRAFT=(S.recipe&&S.recipe.rows.length?[...S.recipe.rows.map(r=>({...r}))]:[{item:"",pct:""},{item:"",pct:""},{item:"",pct:""}]).slice(0,12);return RECIPE_DRAFT}
+function recipeAddRow(){const d=draftRows();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
+function recipeDelRow(i){const d=draftRows();d.splice(i,1);render()}
+function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
+  if(!(t>0)){alert("每日总耗料要大于0");return}
+  const rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i];if(it&&pc>0)rows.push({item:it,pct:pc})}
+  const sum=rows.reduce((a,r)=>a+r.pct,0);
+  if(!rows.length){alert("至少填一行品种");return}
+  if(Math.abs(sum-100)>0.5&&!confirm(`品种占比合计 ${sum}%, 不是100%, 仍要保存吗?(系统会按比例折算)`))return;
+  rows.forEach(r=>r.pct=r.pct/sum*100);
+  S.recipe={total:t,rows,per:+d.per||r2(t/stockCount()*10),enabled:true};RECIPE_DRAFT=null;touchSave();render()}
+function recipeToggle(){S.recipe.enabled=!S.recipe.enabled;touchSave();render()}
+function runConsume(){ // 手动"记今日消耗"(补记/重记今日; 自动消耗在启动时做)
+  const R=recipeGet();if(!R.enabled||!(R.total>0)||!R.rows.length){alert("请先设置配方并启用");return}
+  consumeDay(today(),true);render()}
+function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当日已有则跳过, force 则先撤旧)
+  const R=recipeGet();if(!(R.total>0)||!R.rows.length)return false;
+  const old=S.feedLog.filter(r=>r.auto&&r.date===day);
+  if(old.length){if(!force)return false;old.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
+    S.feedLog=S.feedLog.filter(r=>!(r.auto&&r.date===day))}
+  const tag=`自动消耗 ${day.slice(5).replace("-","/")}`;
+  R.rows.forEach(row=>{const jin=r2(R.total*row.pct/100);if(jin<=0)return;
+    S.feedStock[row.item]=r2((S.feedStock[row.item]||0)-jin);
+    S.feedLog.push({id:uid(),date:day,item:row.item,dir:"出库(饲喂)",qty:jin,unit:"斤",jin,auto:true,note:tag})});
+  S.consume[day]=true;touchSave();return true}
+function backfillConsume(){ // 启动时补齐上次用到今天的每日消耗(每次打开最多补7天, 再久提示手动核)
+  const R=recipeGet();if(!S.recipe||!R.enabled||!(R.total>0)||!R.rows.length)return;
+  const days=[];const d=new Date();
+  for(let i=0;i<7;i++){const ds=d.toISOString().slice(0,10);if(!S.consume[ds])days.push(ds);d.setDate(d.getDate()-1)}
+  days.reverse().forEach(day=>consumeDay(day,false))}
+function feedInv(){ // 库存盘查: 每品种库存/日耗/可撑天数
+  const R=recipeGet();const daily={};R.rows.forEach(r=>daily[r.item]=R.total*r.pct/100);
+  const items=new Set([...Object.keys(S.feedStock),...Object.keys(daily)]);
+  return [...items].map(k=>{const st=S.feedStock[k]||0,d=daily[k]||0;
+    const days=d>0?Math.floor(st/d*10)/10:null;
+    return {item:k,st,daily:d,days}})}
+function invAlerts(){return feedInv().filter(x=>x.daily>0).map(x=>{if(x.days===null)return null;
+  if(x.days<0)return {lvl:"r",txt:`${x.item} 已透支 ${fmt(Math.abs(x.st))} 斤(库存为负, 该入库了)`};
+  if(x.days<=3)return {lvl:"r",txt:`${x.item} 仅够 ${x.days<1?"不足1":x.days} 天(${fmt(x.st)}斤)`};
+  if(x.days<=7)return {lvl:"w",txt:`${x.item} 约 ${x.days} 天(${fmt(x.st)}斤)`};return null}).filter(Boolean)}
+function vaxAlerts(){const out=[];const t=today();
+  // 来自免疫计划的待办: 未勾选且日期已进入7天窗口或已过期
+  if(S.plan&&S.plan.start){for(const it of planAll()){if(S.plan.done&&S.plan.done.includes(it.cid||it.d))continue;const due=addDays(S.plan.start,it.d);if(due<=addDays(t,7))out.push({name:it.name,due,lvl:due<t?"w":"s",txt:`${due<t?"已过期":"计划"} ${due} · ${it.name}(${it.d}日龄)`})}}
+  // 来自免疫档案的下次免疫
+  for(const v of S.vaccines){if(!v.next)continue;if(v.next<t)out.push({...v,due:v.next,lvl:"w",txt:`已到期 ${v.next} · ${v.name}`});else{const dd=Math.round((new Date(v.next)-new Date(t))/864e5);if(dd<=7)out.push({...v,due:v.next,lvl:"s",txt:`${dd===0?"今天":dd+"天后"} ${v.next} · ${v.name}`})}}
+  return out.sort((a,b)=>a.due<b.due?-1:1)}
+const addDays=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+function planAge(){if(!S.plan||!S.plan.start)return null;return Math.round((new Date(today()+"T00:00:00")-new Date(S.plan.start+"T00:00:00"))/864e5)}
+function planDoneCount(){return S.plan&&S.plan.done?S.plan.done.length:0}
+
+// ================= 视图 =================
+function vDash(){
+  const m=monthOf(today());
+  const stock=stockCount();
+  const mSale=monthSum(S.sales,"date",salesAmt,m);
+  const mExp=monthSum(S.finance,"date",r=>r.kind==="支"?r.amount:0,m);
+  const mInc=mSale+S.finance.filter(r=>r.kind==="收"&&monthOf(r.date)===m).reduce((a,r)=>a+r.amount,0);
+  const alerts=vaxAlerts();
+  const low=lowFeed();
+  const kg=s=>s>=2000?(s/2000).toFixed(2)+" 吨":s>=1000?(s/1000).toFixed(1)+" 千斤":fmt(s)+" 斤";
+  const stockRows=Object.entries(S.feedStock).filter(([k,v])=>v!==0).map(([k,v])=>`<tr><td>${k}</td><td class="money ${v<=100?'neg':''}">${kg(v)}</td></tr>`).join("")||`<tr><td class="empty">暂无库存记录, 去「饲料物料」进货</td></tr>`;
+  const alertHtml=alerts.length?alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="w"?"过期未免":"即将到期"}</span> ${a.txt} <a href="#" onclick="go('vax');return false" style="color:#B87A10;font-size:13px">去记录 →</a></div>`).join(""):`<div class="empty">✅ 近7天无疫苗待办</div>`;
+  return `
+  <div class="cards">
+    <div class="card"><div class="num">${fmt(stock)}</div><div class="lab">栏内存栏(只)</div></div>
+    <div class="card good"><div class="num">¥${fmt(mInc)}</div><div class="lab">本月收入</div></div>
+    <div class="card"><div class="num">¥${fmt(mExp)}</div><div class="lab">本月支出</div></div>
+    <div class="card ${mInc-mExp<0?'warn':'good'}"><div class="num">¥${fmt(r2(mInc-mExp))}</div><div class="lab">本月结余</div></div>
+  </div>
+  <section class="panel"><h2>💉 疫苗提醒</h2>${alertHtml}</section>
+  <section class="panel"><h2>🌾 饲料库存</h2>
+    ${low.length?`<div style="margin-bottom:6px"><span class="tag w">需补货</span> ${low.join("、")}</div>`:""}
+    <table><tr><th>物料</th><th>当前库存</th></tr>${stockRows}</table>
+  </section>
+  <section class="panel"><h2>🥚 本月销售明细</h2>${salesTable(m,true)}</section>`;
+}
+
+function vFlock(){
+  return `<section class="panel"><h2>➕ 栏群变动登记</h2>
+  <form onsubmit="addFlock(event)">
+    <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>类型</label><select name="type"><option>进雏/上鸡</option><option>死淘</option><option>淘汰鸡出售</option><option>转入</option><option>转出</option></select></div>
+    <div class="field"><label>鸡舍/批次</label><input name="house" list="houselist" placeholder="1号舍" required>${datalistTag("houselist",houseList())}</div>
+    <div class="field"><label>数量(+进/-出)</label><input type="number" name="qty" placeholder="死淘填负数" required></div>
+    <div class="field"><label>备注</label>${noteField('flock')}</div>
+    <button class="go">登记</button>
+  </form>
+  <div class="hint">当前存栏 = 各次变动相加。死淘、出售都填负数; 存栏显示在「总览」。</div></section>
+  <section class="panel"><h2>📋 变动流水</h2>${flockTable()}</section>`;
+}
+function flockTable(){if(!S.flock.length)return `<div class="empty">还没有记录</div>`;
+  const rows=[...S.flock].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.type}</td><td>${r.house}</td><td class="money ${r.qty<0?'neg':'pos'}">${r.qty>0?"+":""}${r.qty}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('flock','${r.id}')">删</button></td></tr>`).join("");
+  return `<table><tr><th>日期</th><th>类型</th><th>鸡舍</th><th>数量</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="3"><b>当前存栏合计</b></td><td class="money"><b>${stockCount()}</b></td><td colspan="2"></td></tr></table>`}
+
+function vFeed(){
+  const R=recipeGet();const stock=stockCount();
+  const inv=feedInv();const ia=invAlerts();
+  const dc=x=>x.days===null?"":x.days<0?`<span class="tag r">已透支</span>`:x.days<=3?`<span class="tag r">仅够${x.days<1?"不足1":x.days}天</span>`:x.days<=7?`<span class="tag w">约${x.days}天</span>`:`<span style="color:#2E7D32;font-size:12px">够${x.days}天</span>`;
+  const invRows=inv.map(x=>{
+    return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
+  const rRows=draftRows().map((r,i)=>`<tr><td><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:90px"></td><td style="white-space:nowrap"><input name="rp${i}" type="number" step="0.1" value="${Math.round(r.pct*10)/10}" placeholder="占比" style="width:64px">% <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行">✕</button></td></tr>`).join("");
+  const recipeHtml=`
+  <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
+  ${R.total>0?`<div style="margin-bottom:8px"><span class="tag ${R.enabled?'s':'w'}">${R.enabled?"● 启用中":"⏸ 已停用"}</span> 每日 <b>${fmt(R.total)}</b> 斤${R.per?` · 折合 <b>${R.per}</b> 两/只·天(存栏${fmt(stock)}只)`:""} <button class="mini" onclick="recipeToggle()">${R.enabled?"停用":"启用"}</button></div>`:""}
+  <form onsubmit="saveRecipe(event)">
+    <div class="field"><label>每日总耗料(斤)</label><input type="number" step="0.01" name="total" value="${R.total||""}" placeholder="如 2200" required></div>
+    <div class="field"><label>每只日耗(两/只, 可不填)</label><input type="number" step="0.01" name="per" value="${R.per||""}" placeholder="如 2.2, 填了只作参考显示"></div>
+    <table style="margin:4px 0"><tr><th>品种</th><th>占比</th></tr>
+      ${rRows}
+    </table>
+    <button type="button" class="mini" onclick="recipeAddRow()">➕ 加一个品种</button>
+    <datalist id="feed_items_dl">${FEED_ITEMS.map(i=>`<option value="${i}">`).join("")}</datalist>
+    <button class="go">保存配方</button>
+  </form>
+  <div class="hint">品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天)。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
+  <section class="panel"><h2>📊 库存盘查(入库 − 消耗 = 现有)</h2>
+    ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
+    <table><tr><th>品种</th><th>现有库存</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
+    <div class="hint">黄牌=够吃7天内, 红牌=3天内, 该备料了。库存为负=漏记入库。</div></section>`;
+  return recipeHtml+`<section class="panel"><h2>➕ 物料出入库</h2>
+  <form onsubmit="addFeed(event)">
+    <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>物料名</label>${smartField('item',FEED_ITEMS)}</div>
+    <div class="field"><label>方向</label><select name="dir"><option>入库</option><option>出库(饲喂)</option></select></div>
+    <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
+    <div class="field"><label>单位</label><select name="unit">${FEED_UNITS.map(u=>`<option value="${u[0]}">${u[0]}</option>`).join('')}</select></div>
+    <div class="field"><label>单价(元/斤)</label><input type="number" step="0.01" name="price"></div>
+    <div class="field"><label>备注</label>${noteField('feed')}</div>
+    <button class="go">记账</button>
+  </form>
+  <div class="hint">入库自动加库存; 出库自动减库存。若同时填了单价和金额, 记得在「收支台账」补一笔支出。</div></section>
+  <section class="panel"><h2>📦 当前库存</h2><table><tr><th>物料</th><th>库存(折算斤)</th></tr>${Object.keys(S.feedStock).length?Object.keys(S.feedStock).map(k=>`<tr><td>${k}</td><td class="money ${S.feedStock[k]<0?'neg':''}">${fmt(S.feedStock[k])}</td></tr>`).join(""):`<tr><td class="empty">暂无</td></tr>`}</table><div class="hint">入库支持 斤 / 公斤 / 吨 / 包(50kg), 账本统一按斤累计。</div></section>
+  <section class="panel"><h2>📋 出入库流水</h2>${feedTable()}</section>`;
+}
+function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有记录</div>`;
+  const rows=[...S.feedLog].sort((a,b)=>a.date<b.date?1:-1).map(r=>{const jin=r.jin!==undefined?r.jin:(+r.qty);const unit=r.unit||"斤";return `<tr><td>${r.date}</td><td>${r.item}</td><td>${r.dir}</td><td class="money">${r.dir.startsWith("出")?"-":"+"}${fmt(r.qty)}${unit}</td><td>${r.price?r.price+"元/斤":""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`}).join("");
+  return `<table><tr><th>日期</th><th>物料</th><th>方向</th><th>数量</th><th>单价</th><th>备注</th><th></th></tr>${rows}</table>`}
+
+function vFin(){
+  const m=monthOf(today());
+  const inc=S.finance.filter(r=>r.kind==="收"&&monthOf(r.date)===m).reduce((a,r)=>a+r.amount,0)+monthSum(S.sales,"date",salesAmt,m);
+  const exp=S.finance.filter(r=>r.kind==="支"&&monthOf(r.date)===m).reduce((a,r)=>a+r.amount,0);
+  return `<section class="panel"><h2>➕ 记一笔收支</h2>
+  <form onsubmit="addFin(event)">
+    <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>收/支</label><select name="kind"><option>支</option><option>收</option></select></div>
+    <div class="field"><label>类别</label><select name="cat" onchange="syncFinItems(this.value)">${Object.keys(FIN_ITEMS).map(c=>`<option>${c}</option>`).join('')}</select></div>
+    <div class="field"><label>品名</label>${smartField('item',FIN_ITEMS["饲料原料"],'fin_item')}</div>
+    <div class="field"><label>金额(元)</label><input type="number" step="0.01" name="amount" required></div>
+    <div class="field"><label>备注</label>${noteField('finance')}</div>
+    <button class="go">记</button>
+  </form>
+  <div class="hint">类别选好, 品名自动跟着换(选"饲料原料"就出玉米/豆粕清单)。特殊品名点「✏️ 自定义」。鸡蛋销售收入不用在这里重复记。</div></section>
+  <section class="panel"><h2>📄 月度流水</h2>
+  <form onsubmit="setFinMonth(event)" style="margin-bottom:4px"><div class="field"><label>月份</label><input type="month" name="m" value="${m}"></div><button class="go">查看</button></form>
+  <div id="finmonth">${finTable(m)}</div>
+  <div class="hint">本月: 收入 <b class="pos">¥${fmt(inc)}</b> / 支出 <b class="neg">¥${fmt(exp)}</b> / 结余 <b class="money">¥${fmt(r2(inc-exp))}</b></div></section>`;
+}
+function syncFinItems(cat){const sel=document.getElementById('fin_item');if(!sel)return;const opts=FIN_ITEMS[cat]||["其他"];sel.innerHTML=opts.map(o=>`<option>${o}</option>`).join('')+`<option value="__custom__">✏️ 自定义…</option>`;const c=sel.nextElementSibling;c.style.display='none';c.required=false;c.value=''}
+function finTable(m){const rows=S.finance.filter(r=>monthOf(r.date)===m).sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td><span class="tag ${r.kind==='收'?'ok':'w'}">${r.kind}</span></td><td>${r.cat}</td><td>${r.item||"—"}</td><td class="money ${r.kind==='支'?'neg':'pos'}">${r.kind==='支'?'-':'+'}${fmt(r.amount)}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('finance','${r.id}')">删</button></td></tr>`).join("");
+  return rows?`<table><tr><th>日期</th><th>类型</th><th>类别</th><th>品名</th><th>金额</th><th>备注</th><th></th></tr>${rows}</table>`:`<div class="empty">本月暂无收支记录</div>`}
+function setFinMonth(e){e.preventDefault();document.getElementById("finmonth").innerHTML=finTable(e.target.m.value)}
+
+function vSales(){
+  const m=monthOf(today());
+  return `<section class="panel"><h2>➕ 销售记账</h2>
+  <form onsubmit="addSale(event)">
+    <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>渠道</label><select name="channel"><option>批发</option><option>自提点</option><option>抖音</option><option>食堂直供</option><option>散客</option><option>其他</option></select></div>
+    <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
+    <div class="field"><label>单位</label><select name="unit"><option>斤</option><option>枚</option><option>件</option></select></div>
+    <div class="field"><label>单价(元)</label><input type="number" step="0.01" name="price" required></div>
+    <div class="field"><label>买家</label><input name="buyer" list="buyerlist" placeholder="选历史或输入">${datalistTag("buyerlist",buyerList())}</div>
+    <div class="field"><label>备注</label>${noteField('sales')}</div>
+    <button class="go">记账</button>
+  </form>
+  <div class="hint">买家栏会自动联想你记过的老客户; 备注选常用语即可。</div></section>
+  <section class="panel"><h2>📄 销售流水</h2>${salesTable(m,false)}</section>
+  <section class="panel"><h2>📊 渠道汇总(本月)</h2>${channelTable(m)}</section>`;
+}
+function salesTable(m,dashOnly){
+  let list=[...S.sales].sort((a,b)=>a.date<b.date?1:-1);
+  if(dashOnly)list=list.filter(r=>monthOf(r.date)===m);
+  if(!list.length)return `<div class="empty">暂无销售记录</div>`;
+  const rows=list.map(r=>`<tr><td>${r.date}</td><td>${r.channel}</td><td class="money">${fmt(r.qty)}${r.unit}</td><td class="money">${r.price}元/${r.unit}</td><td class="money pos">¥${fmt(salesAmt(r))}</td><td>${r.buyer||""}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('sales','${r.id}')">删</button></td></tr>`).join("");
+  const tot=list.reduce((a,r)=>a+salesAmt(r),0);
+  return `<table><tr><th>日期</th><th>渠道</th><th>数量</th><th>单价</th><th>金额</th><th>买家</th><th>备注</th><th></th></tr>${rows}<tr><td colspan="4"><b>合计</b></td><td class="money pos"><b>¥${fmt(r2(tot))}</b></td><td colspan="3"></td></tr></table>`}
+function channelTable(m){const t={};S.sales.filter(r=>monthOf(r.date)===m).forEach(r=>{t[r.channel]=t[r.channel]||{amt:0,qty:0};t[r.channel].amt+=salesAmt(r);t[r.channel].qty+=+r.qty});
+  if(!Object.keys(t).length)return `<div class="empty">本月暂无数据</div>`;
+  return `<table><tr><th>渠道</th><th>销量</th><th>销售额</th><th>占比</th></tr>${Object.entries(t).sort((a,b)=>b[1].amt-a[1].amt).map(([k,v])=>{const tot=Object.values(t).reduce((a,x)=>a+x.amt,0);return `<tr><td>${k}</td><td class="money">${fmt(r2(v.qty))}</td><td class="money pos">¥${fmt(r2(v.amt))}</td><td class="money">${Math.round(v.amt/tot*100)}%</td></tr>`}).join("")}</table>`}
+
+function vVax(){
+  const alerts=vaxAlerts();
+  return `<section class="panel"><h2>➕ 免疫记录</h2>
+  <form onsubmit="addVax(event)">
+    <div class="field"><label>免疫日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>疫苗名称</label>${smartField('name',VAX_NAMES)}</div>
+    <div class="field"><label>鸡舍/批次</label><input name="house" list="vhouselist" placeholder="1号舍" required>${datalistTag("vhouselist",houseList())}</div>
+    <div class="field"><label>剂量</label><input name="dose" list="doselist" placeholder="2倍量">${datalistTag("doselist",VAX_DOSE)}</div>
+    <div class="field"><label>方式</label><select name="way"><option>饮水</option><option>注射</option><option>点眼滴鼻</option><option>喷雾</option></select></div>
+    <div class="field"><label>下次免疫日</label><input type="date" name="next"></div>
+    <div class="field"><label>备注</label>${noteField('vax')}</div>
+    <button class="go">登记</button>
+  </form>
+  <div class="hint">填了「下次免疫日」, 总览页会自动提醒: 7天内变黄, 过期变红。免疫记录建议至少保存2年。</div></section>
+  ${alerts.length?`<section class="panel"><h2>⏰ 待办</h2>${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="w"?"过期":"7天内"}</span> ${a.txt}</div>`).join("")}</section>`:""}
+  <section class="panel"><h2>📋 免疫档案</h2>${vaxTable()}</section>`;
+}
+function vaxTable(){if(!S.vaccines.length)return `<div class="empty">还没有免疫记录</div>`;
+  const rows=[...S.vaccines].sort((a,b)=>a.date<b.date?1:-1).map(r=>`<tr><td>${r.date}</td><td>${r.name}</td><td>${r.house}</td><td>${r.dose||""}</td><td>${r.way}</td><td>${r.next?`<span class="tag ${r.next<today()?'w':(Math.round((new Date(r.next)-new Date())/864e5)<=7?'s':'ok')}">${r.next}</span>`:"—"}</td><td>${r.note||""}</td><td class="row-actions"><button class="del" onclick="delRow('vaccines','${r.id}')">删</button></td></tr>`).join("");
+  return `<table><tr><th>日期</th><th>疫苗</th><th>鸡舍</th><th>剂量</th><th>方式</th><th>下次</th><th>备注</th><th></th></tr>${rows}</table>`}
+
+function vPlan(){
+  const started=!!(S.plan&&S.plan.start);
+  if(!started)return `<section class="panel"><h2>🗓 开启全流程免疫计划</h2>
+    <form onsubmit="startPlan(event)">
+      <div class="field"><label>进雏日期(出壳日)</label><input type="date" name="start" value="${today()}" required></div>
+      <div class="field"><label>鸡舍/批次</label><input name="house" list="phouselist" placeholder="1号舍" required>${datalistTag("phouselist",houseList())}</div>
+      <button class="go">生成 0-119 日龄免疫计划</button>
+    </form>
+    <div class="hint">按商品蛋鸡常规免疫程序生成 15 项: 马立克→新城疫→法氏囊→鸡痘→禽流感→开产前联苗+驱虫, 共 119 日龄。生成后总览页自动提醒临期项目; 具体日程以当地兽医和疫苗说明书为准, 可自行调整。</div></section>`;
+  const age=planAge();
+  if(!document.getElementById("pvaxlist")){const dl=document.createElement("div");dl.innerHTML='<datalist id="pvaxlist"><option value="新城疫油苗"><option value="支原体灭活苗"><option value="传鼻灭活苗"><option value="禽流感H9灭活苗"><option value="驱虫(伊维菌素)"></datalist><datalist id="pwaylist"><option value="皮下注射"><option value="肌肉注射"><option value="饮水"><option value="点眼"><option value="拌料"><option value="喷雾"></datalist>';document.body.appendChild(dl)}
+  const doneSet=new Set(S.plan.done||[]);
+  const rows=planAll().map(it=>{const due=addDays(S.plan.start,it.d);const done=doneSet.has(it.d);
+    const dueTs=new Date(due+"T00:00:00").getTime(),nowTs=new Date(today()+"T00:00:00").getTime();
+    const late=!done&&dueTs<nowTs, soon=!done&&!late&&dueTs-nowTs<=7*864e5;
+    const st=done?`<span class="tag ok">已完成</span>`:late?`<span class="tag w">已过期${Math.round((nowTs-dueTs)/864e5)}天</span>`:soon?`<span class="tag s">${Math.ceil((dueTs-nowTs)/864e5)}天后</span>`:`<span class="tag" style="background:#F1EADC;color:#8A7357">待做</span>`;
+    const key=it.cid||it.d;
+    const delBtn=it.cid?` <button class="mini" style="color:#B3261E;border-color:#B3261E;padding:2px 7px;font-size:11px" onclick="delCustomVax('${it.cid}')">删</button>`:"";
+    return `<tr style="${done?'opacity:.55':''}"><td>${it.d}日龄</td><td>${due}</td><td><b>${it.name}</b>${delBtn}<div style="font-size:12px;color:var(--sub)">${it.note}</div></td><td>${it.way}</td><td>${it.dose}</td><td>${st}</td><td>${done?`<button class="mini" onclick="undoPlan('${key}')">撤销</button>`:`<button class="go" style="padding:5px 12px;font-size:13px" onclick="doPlan('${key}')">已做</button>`}</td></tr>`}).join("");
+  const pct=Math.round(doneSet.size/planAll().length*100);
+  return `<section class="panel"><h2>🗓 免疫计划进度</h2>
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <div>${S.plan.house||"本批鸡"} · ${S.plan.start} 进雏 · 今天 ${age<0?"未进雏":age+" 日龄"}</div>
+      <div style="flex:1;min-width:160px;height:10px;background:#F1EADC;border-radius:99px;overflow:hidden"><div style="width:${pct}%;height:100%;background:linear-gradient(90deg,var(--brand2),var(--brand))"></div></div>
+      <div style="font-weight:700;color:var(--brand)">${doneSet.size}/${planAll().length} 项 (${pct}%)</div>
+      <button class="mini" onclick="if(confirm('重置计划? 已勾进度会清空')){S.plan={};save();render()}">重置计划</button>
+    </div>
+    <div class="hint">点「已做」自动把这次免疫写进档案(日期=计划日, 鸡舍=计划鸡舍), 并在计划里打勾。提前或延后做的, 去「疫苗防疫」页手动登记, 再回来点已做即可。</div></section>
+  <section class="panel"><h2>📋 全流程日程表 (0-119日龄)</h2>
+  <table><tr><th>日龄</th><th>计划日期</th><th>疫苗/事项</th><th>方式</th><th>剂量</th><th>状态</th><th></th></tr>${rows}</table></section>
+  <section class="panel"><h2>➕ 计划里加一项(自定义疫苗/事项)</h2>
+  <form onsubmit="addCustomVax(event)">
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div class="field" style="flex:1;min-width:90px"><label>日龄</label><input type="number" name="cd" min="0" max="600" placeholder="130" required></div>
+      <div class="field" style="flex:2;min-width:150px"><label>疫苗/事项</label><input name="cname" list="pvaxlist" placeholder="如: 支原体灭活苗" required></div>
+      <div class="field" style="flex:1;min-width:90px"><label>方式</label><input name="cway" list="pwaylist" placeholder="皮下注射"></div>
+      <div class="field" style="flex:1;min-width:80px"><label>剂量</label><input name="cdose" placeholder="0.5ml"></div>
+    </div>
+    <div class="field"><label>备注(可选)</label><input name="cnote" placeholder="兽医建议 / 用途"></div>
+    <button class="go">加进计划表</button>
+  </form>
+  <div class="hint">加的项和内置 15 项一样: 到期进总览提醒, 点「已做」写进免疫档案。填错了点行内「删」即可。</div></section>`;
+}
+function planAll(){const cs=(S.plan&&S.plan.custom)||[];return VAX_PLAN.concat(cs.map(c=>({d:c.d,name:c.name,way:c.way,dose:c.dose,note:c.note,cid:c.cid})))}
+function addCustomVax(e){ // 计划表加一项自定义疫苗/事项
+  e.preventDefault();const d=fd(e.target);
+  if(!S.plan||!S.plan.start){alert("先开启免疫计划, 再添加自定义项目");return}
+  const day=Math.round(+d.cd);
+  if(!(day>=0&&day<=600)){alert("日龄请填 0-600 之间的数字");return}
+  if(!d.cname.trim()){alert("请填疫苗/事项名称");return}
+  S.plan.custom=S.plan.custom||[];
+  S.plan.custom.push({cid:uid(),d:day,name:d.cname.trim(),way:d.cway.trim()||"—",dose:d.cdose.trim()||"—",note:(d.cnote||"").trim()||"自定义项"});
+  touchSave();render()}
+function delCustomVax(cid){if(!confirm("从计划中删除这一项?"))return;
+  S.plan.custom=(S.plan.custom||[]).filter(c=>c.cid!==cid);
+  S.plan.done=(S.plan.done||[]).filter(x=>x!==cid);
+  touchSave();render()}
+
+function startPlan(e){e.preventDefault();const d=fd(e.target);S.plan={start:d.start,house:d.house,done:[]};touchSave();render()}
+function doPlan(key){const it=planAll().find(x=>(x.cid||x.d)===(isNaN(+key)?key:+key));if(!it)return;const due=addDays(S.plan.start,it.d);
+  S.vaccines.push({id:uid(),date:due,name:it.name,house:S.plan.house||"1号舍",dose:it.dose==="—"?"":it.dose,way:it.way,next:"",note:it.cid?"自定义免疫":"计划内免疫"});
+  S.plan.done=S.plan.done||[];if(!S.plan.done.includes(key))S.plan.done.push(key);touchSave();render()}
+function undoPlan(key){S.plan.done=(S.plan.done||[]).filter(x=>x!==key);touchSave();render()}
+function undoPlan(day){S.plan.done=(S.plan.done||[]).filter(x=>x!==day);touchSave();render()}
+
+// ================= 行情统计 =================
+// 原料价: feedLog 里入库且填了单价 (元/斤); 鸡蛋价: sales (元/斤, 枚/件折算或单独看)
+function periodKey(date,mode){const y=date.slice(0,4),m=+date.slice(5,7);
+  if(mode==="月")return date.slice(0,7);
+  if(mode==="季")return y+" Q"+Math.ceil(m/3);
+  return y}
+function priceStats(list,dateF,pF,mode,weightF){ // 加权平均: 权重=数量
+  const t={};
+  for(const r of list){const p=+pF(r);if(!p||p<=0)continue;const k=periodKey(dateF(r),mode);
+    (t[k]=t[k]||{wsum:0,w:0,n:0});t[k].wsum+=p*(weightF?weightF(r):1);t[k].w+=(weightF?weightF(r):1);t[k].n++}
+  return Object.keys(t).sort().map(k=>({k,avg:r2(t[k].wsum/t[k].w),n:t[k].n}))
+}
+function deltaLine(arr){ // 相邻两期涨跌
+  if(!arr||arr.length<2)return "";
+  const a=arr[arr.length-2].avg,b=arr[arr.length-1].avg;
+  const pct=a?r2((b-a)/a*100):0;
+  return `<span class="tag ${b>=a?'up':'dn'}">${b>=a?"▲":"▼"} ${Math.abs(pct)}%</span> 较上期${b>=a?"涨":"跌"} ${fmt(r2(Math.abs(b-a)))} 元`}
+function priceChart(arr,unit,color){ // 纯CSS柱状图, 无外部库
+  if(!arr.length)return `<div class="empty">暂无带单价的数据 — 去「饲料物料」入库时填单价, 或「鸡蛋销售」记每笔单价</div>`;
+  const max=Math.max(...arr.map(x=>x.avg)),min=Math.min(...arr.map(x=>x.avg));
+  const span=(max-min)||1;
+  const bars=arr.map((x,i)=>{const h=18+Math.round((x.avg-min)/span*82); // 18%~100%高度
+    const up=i>0&&x.avg>=arr[i-1].avg;
+    return `<div class="barwrap"><div class="barval">${x.avg}</div><div class="bar" style="height:${h}%;background:${up?color:'#CC8B6B'}"></div><div class="barlab">${x.k.replace(new RegExp('^'+arr[0].k.slice(0,4)),'')}</div><div class="barn">${x.n}笔</div></div>`}).join("");
+  return `<div class="chart">${bars}</div><div class="hint">柱高=价格水平; 橙色柱=比上期涨, 棕色柱=跌。单价区间 ${min}~${max} ${unit}。</div>`}
+let statMode="月", statItem="玉米", statSide="feed";
+function vStat(){
+  const feedItems=[...new Set(S.feedLog.filter(r=>r.dir==="入库"&&+r.price>0).map(r=>r.item))];
+  const hasFeed=feedItems.length>0, hasEgg=S.sales.some(r=>+r.price>0);
+  if(!hasFeed&&!hasEgg)return `<section class="panel"><h2>📈 行情统计</h2><div class="empty">还没有带单价的数据。<br>① 「饲料物料」入库时填了单价(元/斤)<br>② 「鸡蛋销售」每笔填了单价<br>记上之后, 这里自动出月/季/年行情图。</div></section>`;
+  if(!hasFeed)statSide="egg";
+  // 模式切换
+  const modes=["月","季","年"].map(m=>`<button class="mini ${statMode===m?'active':''}" onclick="setStatMode('${m}')">${m}</button>`).join("");
+  // 原料部分
+  let feedHtml="";
+  if(hasFeed){
+    if(!feedItems.includes(statItem))statItem=feedItems[feedItems.length-1];
+    const itemBtns=feedItems.map(i=>`<button class="mini ${statItem===i?'active':''}" onclick="setStatItem('${i}')">${i}</button>`).join("");
+    const recs=S.feedLog.filter(r=>r.item===statItem&&r.dir==="入库"&&+r.price>0);
+    const stats=priceStats(recs,r=>r.date,r=>r.price,statMode,r=>r.jin||+r.qty);
+    const latest=stats[stats.length-1];
+    feedHtml=`<section class="panel"><h2>🌾 ${statItem}进价 · 按${statMode}</h2>
+      <div style="margin-bottom:8px">${itemBtns}</div>
+      <div class="bigprice">${latest?latest.avg+" <small>元/斤</small>":"—"} ${latest?deltaLine(stats):""}</div>
+      ${priceChart(stats,"元/斤","#D97A1F")}</section>`;
+  }
+  // 鸡蛋部分
+  let eggHtml="";
+  if(hasEgg){
+    const byUnit={};S.sales.forEach(r=>{if(+r.price>0)byUnit[r.unit]=(byUnit[r.unit]||0)+1});
+    const unitRows=Object.keys(byUnit).map(u=>{
+      const stats=priceStats(S.sales.filter(r=>r.unit===u&&+r.price>0),r=>r.date,r=>r.price,statMode,r=>+r.qty);
+      const latest=stats[stats.length-1];
+      return `<section class="panel"><h2>🥚 鸡蛋售价(元/${u}) · 按${statMode}</h2>
+        <div class="bigprice">${latest?latest.avg+" <small>元/"+u+"</small>":"—"} ${latest?deltaLine(stats):""}</div>
+        ${priceChart(stats,"元/"+u,"#2E8B57")}</section>`}).join("");
+    eggHtml=unitRows;
+  }
+  // 明细表
+  const recsAll=[];
+  if(statSide==="feed"&&hasFeed){S.feedLog.filter(r=>r.item===statItem&&r.dir==="入库"&&+r.price>0).forEach(r=>recsAll.push({d:r.date,p:+r.price,q:r.jin||r.qty,u:"斤",src:"入库"}))}
+  S.sales.filter(r=>+r.price>0).forEach(r=>recsAll.push({d:r.date,p:+r.price,q:r.qty,u:r.unit,src:r.channel}));
+  recsAll.sort((a,b)=>a.d<b.d?1:-1);
+  const detRows=recsAll.slice(0,30).map(r=>`<tr><td>${r.d}</td><td>${r.src}</td><td class="money">${fmt(r.q)}${r.u}</td><td class="money">${r.p}元/${r.u}</td></tr>`).join("");
+  return `${feedHtml}${eggHtml}
+  <section class="panel"><h2>🔧 查看</h2><div style="margin-bottom:8px">${modes}</div><div class="hint">切换月/季/年, 上面两张图跟着变。</div></section>
+  <section class="panel"><h2>📋 最近单价明细(前30笔)</h2><table><tr><th>日期</th><th>来源</th><th>数量</th><th>单价</th></tr>${detRows}</table></section>`;
+}
+function setStatMode(m){statMode=m;render()}
+function setStatItem(i){statItem=i;render()}
+
+function recalcStockFromLog(){ // 从全部流水重算库存(合并同步后调用, 消除两机库存漂移)
+  const st={};
+  S.feedLog.forEach(r=>{const j=r2(+r.jin||0);if(!j)return;
+    st[r.item]=r2((st[r.item]||0)+((r.dir||"").startsWith("出")?-j:j))});
+  S.feedStock=st}
+// ================= ☁️ GitHub 私库加密同步 =================
+// 原理: 账本JSON -> 用App密码经PBKDF2派生密钥 -> AES-GCM加密 -> base64 -> 存GitHub私库data.json
+// 云端只有密文; 同一台"密码"才能解开. token只存本机.
+const SYNC_REPO="zhaoyu-12/eggxiaogu-sync";
+async function deriveKey(pw,salt){
+  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
+  return crypto.subtle.deriveKey({name:"PBKDF2",salt,iterations:150000,hash:"SHA-256"},km,{name:"AES-GCM",length:256},false,["encrypt","decrypt"])}
+async function encData(obj,pw){
+  const salt=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12));
+  const key=await deriveKey(pw,salt);
+  const ct=await crypto.subtle.encrypt({name:"AES-GCM",iv},key,new TextEncoder().encode(JSON.stringify(obj)));
+  const all=new Uint8Array(16+12+ct.byteLength);all.set(salt,0);all.set(iv,16);all.set(new Uint8Array(ct),28);
+  return btoa(String.fromCharCode(...all))}
+async function decData(b64,pw){
+  const raw=Uint8Array.from(atob(b64),c=>c.charCodeAt(0));
+  const salt=raw.slice(0,16),iv=raw.slice(16,28),ct=raw.slice(28);
+  const key=await deriveKey(pw,salt);
+  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv},key,ct);
+  return JSON.parse(new TextDecoder().decode(pt))}
+async function ghGet(){ // 拉云端密文(404=云端还没有)
+  const t=S.sync.token;const r=await fetch(`https://api.github.com/repos/${SYNC_REPO}/contents/data.json`,{cache:"no-store",headers:{Authorization:`token ${t}`}});
+  if(r.status===404)return null;if(!r.ok)throw new Error("读取失败 "+r.status);
+  const j=await r.json();return {b64:j.content.replace(/\s/g,""),sha:j.sha}}
+async function ghPut(b64,sha){ // 推密文
+  const t=S.sync.token;
+  const body={message:"账本同步 "+new Date().toISOString().slice(0,16).replace("T"," "),content:b64};
+  if(sha)body.sha=sha;
+  const r=await fetch(`https://api.github.com/repos/${SYNC_REPO}/contents/data.json`,{method:"PUT",headers:{Authorization:`token ${t}`,"Content-Type":"application/json"},body:JSON.stringify(body)});
+  if(!r.ok)throw new Error("上传失败 "+r.status);return (await r.json()).content.sha}
+let LAST_SYNC_MSG="",LAST_SYNC_ERR=false;
+function syncMsg(m,err){LAST_SYNC_MSG=m;LAST_SYNC_ERR=!!err;const el=document.getElementById("sync_msg");if(el)el.innerHTML=`<div class="hint" style="color:${err?'#B3261E':'#2E7D32'}">${m}</div>`;else if(!err)console.log(m)}
+function syncOn(){return !!(S.sync&&S.sync.token&&S.sync.auto)}
+function touchSave(){save();if(syncOn())autoPush()} // 记账即存, 存完排队自动上传
+let pushTimer=null;
+function autoPush(){ // 防抖: 停止记账1.5秒后才真上传, 连续记十几笔只传一次
+  if(pushTimer)clearTimeout(pushTimer);
+  pushTimer=setTimeout(()=>{doPush(true).catch(e=>{LAST_SYNC_MSG="自动上传失败: "+e.message+" (数据已存在本机, 稍后手动传一次即可)";LAST_SYNC_ERR=true;const el=document.getElementById("sync_msg");if(el)el.innerHTML=`<div class="hint" style="color:#B3261E">${LAST_SYNC_MSG}</div>`})},1500)}
+async function mergePull(pw){ // 拉云端, 与本机双向合并(按记录id去重, 互不覆盖, 新账号另算)
+  const cur=await ghGet();if(!cur)return {merged:0};
+  let remote;try{remote=await decData(cur.b64,pw)}catch(e){throw new Error("解不开——密码不对")}
+  let added=0;
+  // 数组类: 双向按 id 并集; 标量类(flock 计划/疫苗计划): remote 有本机没有的 key 才收
+  const arrays=["flock","feedLog","finance","sales","vaccines"];
+  arrays.forEach(k=>{
+    const R=remote[k]||[],L=S[k]||[];
+    const ids=new Set(L.map(r=>r.id).filter(Boolean));
+    const inc=R.filter(r=>!r.id||!ids.has(r.id));
+    if(inc.length){added+=inc.length;S[k]=L.concat(inc)}})
+  Object.keys(remote.plan||{}).forEach(k=>{if(!(k in (S.plan||{})))S.plan[k]=remote.plan[k]});
+  (remote.vaccines||[]).forEach(()=>{});
+  return {merged:added}}
+function syncAutoToggle(on){ // 开关自动同步; 开时把当前密码框的密码记进本机(自动同步要用)
+  S.sync=S.sync||{};
+  if(on){const el=document.getElementById("sync_pw");const pw=el&&el.value.trim();
+    if(!pw){alert("请先在上方输入加密密码, 再打开自动同步");S.sync.auto=false;render();return}
+    S.sync.pw=pw;S.sync.auto=true;save();autoPush();
+    syncMsg("✅ 自动同步已开: 记账后自动上传, 打开App自动并入手账。密码已记在本机(仅本机)。")}
+  else{S.sync.auto=false;save();syncMsg("自动同步已关。")}}
+async function syncMergeNow(){ // 手动触发一次"拉取合并"(不覆盖, 两边并集)
+  try{
+    if(!S.sync||!S.sync.token){syncMsg("请先填入同步令牌",true);return}
+    const el=document.getElementById("sync_pw");const pw=el&&el.value.trim()||S.sync.pw||"";
+    if(!pw){syncMsg("请输入加密密码",true);return}
+    S.sync.pw=pw;
+    syncMsg("⏳ 正在拉取并合并…");
+    const r=await mergePull(pw);
+    if(!r||r.merged===0){syncMsg("云端没有新东西, 两边已是一致。");return}
+    recalcStockFromLog();save();await doPush(false);
+    syncMsg(`✅ 已并入 ${r.merged} 笔, 并回传云端。`);render()}
+  catch(e){syncMsg("❌ "+e.message,true)}}
+async function syncSetup(e){ // 首次配置: 存token
+  e.preventDefault();const d=fd(e.target);const t=(d.token||"").trim();
+  if(!/^(ghp_|gho_|ghu_|ghs_|github_pat_)/.test(t)){syncMsg("token 格式不像 GitHub 的(应以 ghp_ 或 gho_ 开头), 请回 GitHub 粘贴完整的令牌",true);return}
+  S.sync=S.sync||{};S.sync.token=t;save();syncMsg("✅ 已保存令牌(只存本机)。下面可以上传/下载了。");render()}
+async function doPush(isAuto){ // 上传(自动/手动共用): 先拉云端合并, 再整包加密推回
+  if(!S.sync||!S.sync.token)throw new Error("请先填入同步令牌");
+  const pwEl=document.getElementById("sync_pw");
+  const pw=isAuto?(S.sync.pw||""):(pwEl&&pwEl.value||S.sync.pw||"");
+  if(!pw)throw new Error("请输入加密密码");
+  const b64=await encData(S,pw);
+  const cur=await ghGet();
+  if(cur){try{await decData(cur.b64,pw)}catch(e){
+    if(isAuto){S.sync.auto=false;save();throw new Error("云端密码与本机不一致, 已暂停自动同步")}
+    throw new Error("密码与云端那份不一致——为防覆盖错账, 已停止")}}
+  const sha=await ghPut(b64,cur?cur.sha:null);
+  S.sync.lastUp=new Date().toISOString();S.sync.sha=sha;save();
+  if(!isAuto)syncMsg(`✅ 上传成功(${new Date().toLocaleString("zh-CN",{hour12:false})})。另一台设备上点「下载同步」即可拉取。`);
+  return true}
+async function autoPull(){ // 打开App时自动收: 拉云端→按id合并→若并了新记录则重算库存→再回推
+  const pw=S.sync.pw||"";if(!pw)return;
+  const r=await mergePull(pw);
+  if(r&&r.merged>0){recalcStockFromLog();save();
+    LAST_SYNC_MSG=`☁️ 自动同步: 从云端并入 ${r.merged} 笔记录(已重算库存)`;LAST_SYNC_ERR=false;
+    const el=document.getElementById("sync_msg");if(el)el.innerHTML=`<div class="hint" style="color:#2E7D32">${LAST_SYNC_MSG}</div>`;
+    await doPush(true);render()}}
+async function syncUp(){ // 手动上传(旧入口保留)
+  try{await doPush(false)}
+  catch(e){syncMsg("❌ "+e.message,true)}}
+async function syncDown(){ // 手动下载=整包覆盖(旧入口保留, 大搬家时用)
+  try{
+    if(!S.sync||!S.sync.token){syncMsg("请先填入同步令牌",true);return}
+    const pw=document.getElementById("sync_pw").value;
+    if(!pw){syncMsg("请输入解密密码(上传时用的那个)",true);return}
+    syncMsg("⏳ 正在下载并解密…");
+    const cur=await ghGet();
+    if(!cur){syncMsg("云端还没有账本。请先在有数据的设备上「上传到云端」。",true);return}
+    let remote;
+    try{remote=await decData(cur.b64,pw)}catch(e){syncMsg("❌ 解不开——密码不对, 或这份密文是别的密码锁的。",true);return}
+    const nR=(remote.feedLog||[]).length+(remote.sales||[]).length+(remote.finance||[]).length;
+    const nL=S.feedLog.length+S.sales.length+S.finance.length;
+    if(!confirm(`云端账本: 流水约 ${nR} 笔(存栏${(remote.flock||[]).reduce((a,r)=>a+r.qty,0)}只)\n本机账本: 流水约 ${nL} 笔\n\n用云端覆盖本机? 本机现有数据会先自动导出一份备份。`))return;
+    exportData(true); // 静默导出保底
+    const keep={sync:S.sync,auth:S.auth};
+    S=Object.assign(JSON.parse(JSON.stringify(EMPTY)),remote);
+    S.sync=keep.sync;S.auth=keep.auth||S.auth;
+    if(!S.consume)S.consume={};if(!S.recipe)S.recipe=null;
+    S.sync.sha=cur.sha;S.sync.lastDown=new Date().toISOString();save();
+    syncMsg(`✅ 下载并恢复成功(${new Date().toLocaleString("zh-CN",{hour12:false})})。`);render()}
+  catch(e){syncMsg("❌ "+e.message,true)}}
+
+function vBak(){
+  const sc=S.sync||{};
+  const syncHtml=`
+  <section class="panel"><h2>☁️ 多设备同步(GitHub 加密私库)</h2>
+  ${sc.token?`<div style="margin-bottom:6px"><span class="tag s">● 已配置</span> ${sc.lastUp?`上次上传 ${new Date(sc.lastUp).toLocaleString("zh-CN",{hour12:false})}`:"尚未上传"} ${sc.lastDown?` · 上次下载 ${new Date(sc.lastDown).toLocaleString("zh-CN",{hour12:false})}`:""}</div>`:`<div class="hint" style="margin-bottom:6px">首次使用: 在 GitHub 网页登录后打开 <b>github.com/settings/tokens/new</b> → 勾选 <b>repo</b> 权限 → 生成令牌并复制(ghp_开头, 只显示一次)。这是您设备的"同步钥匙"。</div>`}
+  ${sc.token?"":`<form onsubmit="syncSetup(event)"><div class="field"><label>同步令牌(ghp_开头)</label><input type="password" name="token" placeholder="粘贴 GitHub 令牌" required></div><button class="go">保存令牌</button></form>`}
+  ${sc.token?`
+  <div class="field"><label>加密密码(两台设备必须一致)</label><input type="password" id="sync_pw" value="${sc.pw||""}" placeholder="上传/解开账本用的密码"></div>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+    <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" id="sync_auto" ${sc.auto?"checked":""} onchange="syncAutoToggle(this.checked)"> 自动同步(记账即传, 打开即收)</label>
+  </div>
+  <div style="display:flex;gap:8px"><button class="go" onclick="syncUp()">⬆️ 立即上传</button><button class="mini" onclick="syncDown()">⬇️ 整包覆盖(搬家用)</button><button class="mini" onclick="syncMergeNow()">⬇️⬆️ 拉取合并</button></div>`:""}
+  <div id="sync_msg">${LAST_SYNC_MSG?`<div class="hint" style="color:${LAST_SYNC_ERR?'#B3261E':'#2E7D32'}">${LAST_SYNC_MSG}</div>`:""}</div>
+  <div class="hint">账本先用密码加密再上传, 云端私库只有乱码。用法: 老设备「上传」→ 新设备「下载」; 平时哪台记完传一次。令牌只存本机, 清缓存后需重填一次。手机号都不用注册——GitHub 账号咱已经有了。</div></section>`;
+  return syncHtml+`<section class="panel"><h2>📤 导出备份</h2>
+  <button class="go" onclick="exportData()">下载备份文件 (.json)</button>
+  <div class="hint">数据存在浏览器里, 换电脑/清缓存会丢。建议每月导出一次, 存到微信文件传输助手或U盘。</div></section>
+  <section class="panel"><h2>📥 导入恢复</h2>
+  <input type="file" accept=".json" onchange="importData(event)">
+  <div class="hint">导入会覆盖当前数据, 导入前先导出一份。</div></section>
+  <section class="panel"><h2>⚠️ 清空数据</h2>
+  <button class="mini" style="color:#C96A6A;border-color:#E5B4B4" onclick="if(confirm('确定清空全部数据? 此操作不可恢复!')&&confirm('再次确认: 真的清空?')){localStorage.removeItem(KEY);sessionStorage.removeItem('gx_login');location.reload()}">清空全部数据</button></section>
+  <section class="panel"><h2>🔒 密码与锁屏</h2>
+    <button class="go" onclick="lockNow()">立即锁屏</button>
+    <div class="hint">锁屏后需输入密码再进。忘密码: 锁屏后点「忘记密码」答密保问题即可重设, 数据不动。密保答案散列存本机, 无法查看原文。</div></section>`;
+}
+
+// ================= 增删 =================
+function fd(f){const o={};new FormData(f).forEach((v,k)=>{if(k.endsWith("_c"))return;o[k]=typeof v==="string"?v.trim():v});f.querySelectorAll("select").forEach(s=>{if(s.value==="__custom__"){const c=f.querySelector(`[name="${s.name}_c"]`);o[s.name]=c&&c.value.trim()?c.value.trim():""}delete o[s.name+"_c"]});return o}
+function addFlock(e){e.preventDefault();const d=fd(e.target);S.flock.push({id:uid(),...d,qty:+d.qty});touchSave();render()}
+function addFeed(e){e.preventDefault();const d=fd(e.target);const u=FEED_UNITS.find(x=>x[0]===d.unit);const jin=r2(+d.qty*(u?u[1]:1));const out=d.dir.startsWith("出");S.feedStock[d.item]=(S.feedStock[d.item]||0)+(out?-jin:jin);if(S.feedStock[d.item]<0&&!confirm(`${d.item}库存将变为${S.feedStock[d.item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[d.item]+=out?jin:-jin;return}S.feedLog.push({id:uid(),date:d.date,item:d.item,dir:d.dir,qty:+d.qty,unit:d.unit||"斤",jin,price:d.price,note:d.note});touchSave();render()}
+function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount)});touchSave();render()}
+function addSale(e){e.preventDefault();const d=fd(e.target);S.sales.push({id:uid(),...d,qty:+d.qty,price:+d.price});touchSave();render()}
+function addVax(e){e.preventDefault();const d=fd(e.target);S.vaccines.push({id:uid(),...d});touchSave();render()}
+function delRow(arr,id){if(!confirm("删除这条记录?"))return;S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
+function exportData(silent){const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`蛋小固管家备份_${today()}.json`;if(silent)return;a.click()}
+function importData(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!confirm("导入将覆盖当前数据, 继续?"))return;S=Object.assign(JSON.parse(JSON.stringify(EMPTY)),d);save();location.reload()}catch(err){alert("文件不是有效备份: "+err.message)}};rd.readAsText(f)}
+function afterRender(){}
+
+// ================= 启动 =================
+if(loggedIn()){renderNav();bootApp()}else{renderNav();loginScreen()}
+document.title="蛋小固 · 蛋鸡场管家";
+// PWA: 注册离线缓存 (file:// 打开时自动跳过, 不影响本地使用)
+if("serviceWorker" in navigator&&location.protocol.startsWith("http")){
+  navigator.serviceWorker.register("sw.js").catch(()=>{})}
+</script>
+</body>
+</html>
