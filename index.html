@@ -618,8 +618,8 @@ function vPlan(){
     <div class="hint">按商品蛋鸡常规免疫程序生成 15 项: 马立克→新城疫→法氏囊→鸡痘→禽流感→开产前联苗+驱虫, 共 119 日龄。生成后总览页自动提醒临期项目; 具体日程以当地兽医和疫苗说明书为准, 可自行调整。</div></section>`;
   const age=planAge();
   if(!document.getElementById("pvaxlist")){const dl=document.createElement("div");dl.innerHTML='<datalist id="pvaxlist"><option value="新城疫油苗"><option value="支原体灭活苗"><option value="传鼻灭活苗"><option value="禽流感H9灭活苗"><option value="驱虫(伊维菌素)"></datalist><datalist id="pwaylist"><option value="皮下注射"><option value="肌肉注射"><option value="饮水"><option value="点眼"><option value="拌料"><option value="喷雾"></datalist>';document.body.appendChild(dl)}
-  const doneSet=new Set(S.plan.done||[]);
-  const rows=planAll().map(it=>{const due=addDays(S.plan.start,it.d);const done=doneSet.has(it.d);
+  const doneSet=new Set((S.plan.done||[]).map(String)); // key统一字符串(历史数字/字符串混存)
+  const rows=planAll().map(it=>{const due=addDays(S.plan.start,it.d);const done=doneSet.has(String(it.cid||it.d));
     const dueTs=new Date(due+"T00:00:00").getTime(),nowTs=new Date(today()+"T00:00:00").getTime();
     const late=!done&&dueTs<nowTs, soon=!done&&!late&&dueTs-nowTs<=7*864e5;
     const st=done?`<span class="tag ok">已完成</span>`:late?`<span class="tag w">已过期${Math.round((nowTs-dueTs)/864e5)}天</span>`:soon?`<span class="tag s">${Math.ceil((dueTs-nowTs)/864e5)}天后</span>`:`<span class="tag" style="background:#F1EADC;color:#8A7357">待做</span>`;
@@ -668,8 +668,8 @@ function delCustomVax(cid){if(!confirm("从计划中删除这一项?"))return;
 function startPlan(e){e.preventDefault();const d=fd(e.target);S.plan={start:d.start,house:d.house,done:[]};touchSave();render()}
 function doPlan(key){const it=planAll().find(x=>(x.cid||x.d)===(isNaN(+key)?key:+key));if(!it)return;const due=addDays(S.plan.start,it.d);
   S.vaccines.push({id:uid(),date:due,name:it.name,house:S.plan.house||"1号舍",dose:it.dose==="—"?"":it.dose,way:it.way,next:"",note:it.cid?"自定义免疫":"计划内免疫"});
-  S.plan.done=S.plan.done||[];if(!S.plan.done.includes(key))S.plan.done.push(key);touchSave();render()}
-function undoPlan(key){S.plan.done=(S.plan.done||[]).filter(x=>x!==key);touchSave();render()}
+  S.plan.done=(S.plan.done||[]).map(String);if(!S.plan.done.includes(String(key)))S.plan.done.push(String(key));touchSave();render()}
+function undoPlan(key){S.plan.done=(S.plan.done||[]).map(String).filter(x=>x!==String(key));touchSave();render()}
 function undoPlan(day){S.plan.done=(S.plan.done||[]).filter(x=>x!==day);touchSave();render()}
 
 // ================= 行情统计 =================
