@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>张工接单本</title>
+<style>
+:root{--pri:#2E7D32;--pri2:#E8F5E9;--warn:#B3261E;--sub:#8A8A8A;--bg:#F6F5F1;--card:#FFF}
+*{margin:0;padding:0;box-sizing:border-box;font-family:-apple-system,"PingFang SC",sans-serif}
+body{background:var(--bg);padding-bottom:70px}
+header{background:var(--pri);color:#fff;padding:14px 16px;font-size:17px;font-weight:600;display:flex;justify-content:space-between;align-items:center}
+header small{font-size:11px;opacity:.85;font-weight:400}
+.tabs{position:fixed;bottom:0;left:0;right:0;background:#fff;display:flex;border-top:1px solid #eee;z-index:9}
+.tabs button{flex:1;border:0;background:none;padding:9px 0 7px;font-size:11px;color:var(--sub)}
+.tabs button.on{color:var(--pri);font-weight:600}
+.tabs button .ic{display:block;font-size:19px;margin-bottom:1px}
+section{padding:12px}
+.card{background:var(--card);border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 3px rgba(0,0,0,.05)}
+.card h3{font-size:14px;margin-bottom:10px;color:#333}
+.stat{display:flex;gap:8px}
+.stat .s{flex:1;background:var(--pri2);border-radius:10px;padding:10px 6px;text-align:center}
+.stat .s b{display:block;font-size:19px;color:var(--pri)}
+.stat .s span{font-size:10.5px;color:var(--sub)}
+.row{display:flex;align-items:center;padding:10px 0;border-bottom:1px solid #f2f2f2;gap:8px}
+.row:last-child{border:0}
+.row .info{flex:1;min-width:0}
+.row .info b{font-size:14px;display:block}
+.row .info small{font-size:11px;color:var(--sub);display:block;margin-top:2px}
+.money{font-weight:700;font-size:14px;white-space:nowrap}
+.money.neg{color:var(--warn)} .money.pos{color:var(--pri)}
+.tag{font-size:10px;padding:2px 6px;border-radius:4px;background:#EEE;white-space:nowrap}
+.tag.paid{background:var(--pri2);color:var(--pri)}
+.tag.due{background:#FDEEEE;color:var(--warn)}
+.tag.half{background:#FFF7E6;color:#B8860B}
+button.go{background:var(--pri);color:#fff;border:0;border-radius:8px;padding:8px 14px;font-size:13px}
+button.mini{background:#f0f0f0;border:0;border-radius:6px;padding:6px 10px;font-size:12px}
+form .f{margin-bottom:10px}
+form label{font-size:12px;color:var(--sub);display:block;margin-bottom:4px}
+form input,form select,form textarea{width:100%;border:1px solid #ddd;border-radius:8px;padding:10px;font-size:14px;background:#fff}
+form textarea{height:60px;resize:none}
+.empty{text-align:center;color:var(--sub);font-size:13px;padding:24px 0}
+.toast{position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.78);color:#fff;padding:10px 18px;border-radius:8px;font-size:13px;z-index:99;display:none}
+.hint{font-size:11px;color:var(--sub);margin-top:6px;line-height:1.6}
+</style>
+</head>
+<body>
+<header><span>📋 张工接单本</span><small id="today"></small></header>
+<section id="main"></section>
+<div class="tabs">
+<button class="on" onclick="go('dash')"><span class="ic">📊</span>总览</button>
+<button onclick="go('orders')"><span class="ic">📁</span>订单</button>
+<button onclick="go('add')"><span class="ic">➕</span>记单</button>
+<button onclick="go('cust')"><span class="ic">👤</span>客户</button>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+"use strict";
+const KEY="zhanggong_orders_v1";
+let S = JSON.parse(localStorage.getItem(KEY)||'{"orders":[]}');
+function save(){localStorage.setItem(KEY,JSON.stringify(S));}
+function toast(m){const t=document.getElementById("toast");t.textContent=m;t.style.display="block";setTimeout(()=>t.style.display="none",2200);}
+function fmt(n){return "¥"+Number(n||0).toLocaleString("zh");}
+function today(){const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");}
+document.getElementById("today").textContent=today()+" · 固始";
+
+function go(tab){
+  document.querySelectorAll(".tabs button").forEach(b=>b.classList.remove("on"));
+  event.currentTarget.classList.add("on");
+  const m=document.getElementById("main");
+  if(tab==="dash")m.innerHTML=vDash();
+  if(tab==="orders")m.innerHTML=vOrders();
+  if(tab==="add")m.innerHTML=vAdd();
+  if(tab==="cust")m.innerHTML=vCust();
+  window.scrollTo(0,0);
+}
+function statusOf(o){
+  if(o.paidFull)return '<span class="tag paid">已结清</span>';
+  if(o.deposit>0)return '<span class="tag half">定金'+o.deposit+'</span>';
+  return '<span class="tag due">待定金</span>';
+}
+function vDash(){
+  const os=S.orders;
+  const total=os.reduce((a,o)=>a+(+o.price||0),0);
+  const got=os.reduce((a,o)=>a+(+o.deposit||0)+(+o.balance||0),0);
+  const due=total-got;
+  const active=os.filter(o=>!o.paidFull).length;
+  let remind="";
+  const t=today();
+  os.filter(o=>!o.paidFull && o.deliver && o.deliver<t).forEach(o=>{
+    remind+='<div class="row"><div class="info"><b>⏰ '+o.cust+' 的单已过交付日</b><small>'+o.item+' · 交付日 '+o.deliver+'</small></div></div>';
+  });
+  return '<section>'+
+   '<div class="card"><h3>本月经营</h3><div class="stat">'+
+   '<div class="s"><b>'+os.length+'</b><span>总单数</span></div>'+
+   '<div class="s"><b>'+fmt(got)+'</b><span>已收</span></div>'+
+   '<div class="s"><b style="color:var(--warn)">'+fmt(due)+'</b><span>待收</span></div></div>'+
+   '<div class="hint">整包参考: 竣工图800-1000 · 种植图200/张 · 改图50起</div></div>'+
+   (remind?'<div class="card"><h3>⚠️ 该催了</h3>'+remind+'</div>':"")+
+   '<div class="card"><h3>最近订单</h3>'+(os.length?os.slice(-4).reverse().map(o=>
+     '<div class="row"><div class="info"><b>'+o.cust+' · '+o.item+'</b><small>'+o.date+(o.deliver?' · 交 '+o.deliver:'')+'</small></div><div class="money">'+fmt(o.price)+'</div></div>').join(""):'<div class="empty">还没有订单, 点「记单」开始</div>')+'</div></section>';
+}
+function vOrders(){
+  const os=S.orders.slice().reverse();
+  return '<section><div class="card"><h3>全部订单 ('+os.length+')</h3>'+(os.length?os.map((o,i)=>{
+    const idx=S.orders.indexOf(o);
+    return '<div class="row"><div class="info"><b>'+o.cust+' · '+o.item+'</b><small>'+o.date+(o.deliver?' · 交付 '+o.deliver:'')+' · 定金'+(o.deposit||0)+' 尾款'+(o.balance||0)+'</small></div>'+
+    '<div style="text-align:right"><div class="money">'+fmt(o.price)+'</div>'+statusOf(o)+'</div>'+
+    '<div><button class="mini" onclick="settle('+idx+')">'+(o.paidFull?"":"结清")+'</button> <button class="mini" onclick="del('+idx+')">删</button></div></div>';
+  }).join(""):'<div class="empty">暂无订单</div>')+'</div></section>';
+}
+function vAdd(){
+  return '<section><div class="card"><h3>➕ 记一笔订单</h3><form onsubmit="add(event)">'+
+  '<div class="f"><label>客户称呼 *</label><input name="cust" required placeholder="例: 李队长 / 苗木老王"></div>'+
+  '<div class="f"><label>内容 *</label><input name="item" required placeholder="例: 小区绿化竣工图整包(9张)"></div>'+
+  '<div class="f"><label>总价(元) *</label><input name="price" type="number" required placeholder="800"></div>'+
+  '<div class="f"><label>已收定金(元)</label><input name="deposit" type="number" placeholder="0"></div>'+
+  '<div class="f"><label>交付日</label><input name="deliver" type="date" value="'+today()+'"></div>'+
+  '<div class="f"><label>备注</label><textarea name="note" placeholder="含2次修改 / 介绍人是谁"></textarea></div>'+
+  '<button class="go" style="width:100%">保存</button></form></div></section>';
+}
+function add(e){
+  e.preventDefault();
+  const d=Object.fromEntries(new FormData(e.target));
+  S.orders.push({cust:d.cust,item:d.item,price:+d.price,deposit:+(d.deposit||0),balance:0,
+    deliver:d.deliver,note:d.note,date:today(),paidFull:false});
+  save();toast("✅ 已记单: "+d.cust+" "+fmt(d.price));
+  go("dash");
+}
+function settle(i){
+  const o=S.orders[i];
+  if(!o.paidFull){o.balance=(+o.price||0)-(+o.deposit||0);o.paidFull=true;save();toast("✅ 已结清 "+o.cust+" "+fmt(o.price));go("orders");}
+}
+function del(i){
+  if(!confirm("确定删除这条记录?"))return;
+  S.orders.splice(i,1);save();go("orders");
+}
+function vCust(){
+  const map={};
+  S.orders.forEach(o=>{if(!map[o.cust])map[o.cust]={n:0,sum:0};map[o.cust].n++;map[o.cust].sum+=(+o.price||0);});
+  const rows=Object.entries(map).map(([k,v])=>'<div class="row"><div class="info"><b>'+k+'</b><small>'+v.n+' 单</small></div><div class="money pos">'+fmt(v.sum)+'</div></div>').join("");
+  return '<section><div class="card"><h3>客户档案</h3>'+(rows||'<div class="empty">记单后自动汇总</div>')+
+  '</div><div class="card"><h3>📮 朋友圈话术 (长按复制)</h3><div style="font-size:13px;line-height:1.8">固始本地承接: 绿化/管网/硬化工程竣工图, 按验收规范出图、折图编目一条龙。施工方只提供变更单+现场照片, 验收不用愁。整包800起, 看图报价。</div>'+
+  '<button class="go" style="margin-top:8px" onclick="copyAd()">复制话术</button></div></section>';
+}
+function copyAd(){
+  const t="固始本地承接: 绿化/管网/硬化工程竣工图, 按验收规范出图、折图编目一条龙。施工方只提供变更单+现场照片, 验收不用愁。整包800起, 看图报价。联系我→";
+  if(navigator.clipboard)navigator.clipboard.writeText(t).then(()=>toast("已复制, 去粘贴吧"));
+  else toast("长按上面文字手动复制");
+}
+go('dash');
+</script>
+</body>
+</html>
