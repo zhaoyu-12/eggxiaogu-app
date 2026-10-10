@@ -513,11 +513,28 @@ function stockRowsHTML(){
     return `<tr><td>${k}</td><td class="money ${st<0?'neg':''}">${fmt(st)}</td><td class="money ${st<0?'neg':''}">${fmt(kg)}</td><td class="money ${st<0?'neg':''}">${bags}包</td><td><small style="color:#888">${bagKgOf(k)}kg/包</small></td></tr>`}).join("")}
 function feedTable(){if(!S.feedLog.length)return `<div class="empty">还没有记录</div>`;
   const list=[...S.feedLog].sort((a,b)=>a.date<b.date?1:-1);
-  let cur=null,out=[],ind=0,oud=0;
-  list.forEach(r=>{const j=r.jin!==undefined?r.jin:(+r.qty);const isOut=r.dir.startsWith("出");if(isOut)oud+=j;else ind+=j;
-    if(r.date!==cur){out.push(`<tr style="background:#F0E9DC"><td colspan="5"><b>${r.date}</b></td></tr>`);cur=r.date}
-    out.push(`<tr><td>${r.item}</td><td style="color:${isOut?"#B3261E":"#2E7D32"}">${isOut?"出":"入"}</td><td class="money">${isOut?"−":"+"}${fmt(r.qty)} ${r.unit||"斤"}<small style="color:#888"> ${fmt(j)}斤</small></td><td>${r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFeedRow('${r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('feedLog','${r.id}')">删</button></td></tr>`)});
-  return `<table><tr><th>物料</th><th></th><th>数量</th><th>备注</th><th></th></tr>${out.join("")}<tr style="background:#F0E9DC"><td colspan="2"><b>累计</b></td><td class="money"><b style="color:#2E7D32">入${fmt(ind)}斤</b> <b style="color:#B3261E">出${fmt(oud)}斤</b></td><td colspan="2"></td></tr></table><div class="hint">按日期分块, 绿入红出, 小字为折算斤。</div>`}
+  // 分日统计
+  const days=[]; let cur=null,day=null;
+  list.forEach(r=>{const j=r.jin!==undefined?r.jin:(+r.qty);const isOut=r.dir.startsWith("出");
+    if(r.date!==cur){day={date:r.date,rows:[],in:0,out:0};days.push(day);cur=r.date}
+    if(isOut)day.out+=j;else day.in+=j;
+    day.rows.push({r,j,isOut})});
+  // 折叠状态: 全局 FOLD_FEED={date:1展开}; 默认前2天展开, 其余收
+  window.FOLD_FEED=window.FOLD_FEED||{};
+  if(window.FOLD_FEED._init!==list[0].date+list.length){window.FOLD_FEED={_init:list[0].date+list.length};
+    days.forEach((d,i)=>window.FOLD_FEED[d.date]=i<2?1:0)}
+  const td=today();
+  let ind=0,oud=0;
+  const blocks=days.map((d,i)=>{
+    d.rows.forEach(x=>{if(x.isOut)oud+=x.j;else ind+=x.j});
+    const open=!!window.FOLD_FEED[d.date];
+    const label=d.date===td?"今天 "+d.date.slice(5):d.date.slice(5);
+    const head=`<tr style="background:#F0E9DC;cursor:pointer" onclick="foldFeed('${d.date}')"><td colspan="5"><b>${open?"▾":"▸"} ${label}</b> <small style="color:#888">${d.rows.length}笔 · <span style="color:#2E7D32">入${fmt(d.in)}斤</span> <span style="color:#B3261E">出${fmt(d.out)}斤</span></small></td></tr>`;
+    const rows=open?d.rows.map(x=>`<tr><td>${x.r.item}</td><td style="color:${x.isOut?"#B3261E":"#2E7D32"}">${x.isOut?"出":"入"}</td><td class="money">${x.isOut?"−":"+"}${fmt(x.r.qty)} ${x.r.unit||"斤"}<small style="color:#888"> ${fmt(x.j)}斤</small></td><td>${x.r.note||""}</td><td class="row-actions"><button class="mini" onclick="editFeedRow('${x.r.id}')" title="修改">✏️</button><button class="del" onclick="delRow('feedLog','${x.r.id}')">删</button></td></tr>`).join(""):
+      `<tr><td colspan="5" style="color:#AAA;font-size:11px;padding:4px 8px">— 已折叠, 点日期行展开 —</td></tr>`;
+    return head+rows}).join("");
+  return `<table><tr><th>物料</th><th></th><th>数量</th><th>备注</th><th></th></tr>${blocks}<tr style="background:#F0E9DC"><td colspan="2"><b>累计</b></td><td class="money"><b style="color:#2E7D32">入${fmt(ind)}斤</b> <b style="color:#B3261E">出${fmt(oud)}斤</b></td><td colspan="2"></td></tr></table><div class="hint">点日期行可折叠/展开; 默认展开最近两天, 其余收起。</div>`}
+function foldFeed(d){window.FOLD_FEED=FOLD_FEED||{};FOLD_FEED[d]=FOLD_FEED[d]?0:1;render()}
 
 function vFin(){
   const m=monthOf(today());
