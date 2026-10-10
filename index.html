@@ -318,23 +318,34 @@ function recipeDelRow(i){const d=draftRows();harvestDraft();d.splice(i,1);render
 function rowUnitKg(nm,k){if(k>0)return k; // 手填kg优先
   if(S.unitKg&&S.unitKg[nm]){const ks=Object.values(S.unitKg[nm]);if(ks.length)return Math.max.apply(null,ks)} // 该物料记过的最大单位重
   return bagKgOf(nm)}
-function pctFill(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;const d=fd(f);let wsum=0;const w=[];for(let i=0;i<12;i++){const b=+d["rb"+i]||0,nm=(d["ri"+i]||"").trim(),k=rowUnitKg(nm,+d["rk"+i]||0);w.push(b*k);wsum+=b*k}
-  if(!(wsum>0)){alert("先在各行填数量(每单位kg留空则按该物料入库时记的重量)");return}
-  f.querySelectorAll('[name^="rp"]').forEach((el,i)=>{if(w[i]!==undefined)el.value=Math.round(w[i]/wsum*1000)/10});}
-function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
-  if(!(t>0)){alert("每日总耗料要大于0");return}
-  let rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||0;if(it&&pc>0)rows.push({item:it,pct:pc,b:b||undefined,k:b?rowUnitKg(it,k):undefined})}
-  if(!rows.length){let wsum=0;const tmp=[];for(let i=0;i<12;i++){const it=d["ri"+i],b=+d["rb"+i]||0,k=rowUnitKg(it,+d["rk"+i]||0);if(it&&b>0){const w=b*k;tmp.push({item:it,w,b,k});wsum+=w}}if(wsum>0)tmp.forEach(x=>rows.push({item:x.item,pct:r2(x.w/wsum*100),b:x.b,k:x.k}))}
-  const sum=rows.reduce((a,r)=>a+r.pct,0);
-  if(!rows.length){alert("至少填一行品种");return}
-  if(Math.abs(sum-100)>0.5&&!confirm(`品种占比合计 ${sum}%, 不是100%, 仍要保存吗?(系统会按比例折算)`))return;
-  rows.forEach(r=>r.pct=r.pct/sum*100);
-  S.recipe={total:t,rows,per:+d.per||r2(t/stockCount()*10),enabled:true,since:(S.recipe&&S.recipe.since)||today()};RECIPE_DRAFT=null;touchSave();render()}
+function recipeLive(){ // 行编辑实时汇总: 总耗料=Σ(数量×斤/单位), 占比=各行占Σ比例
+  const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;
+  let wsum=0;const ws=[];
+  for(let i=0;i<12;i++){const b=+(f.querySelector('[name="rb'+i+'"]')||{}).value||0;const jin=+(f.querySelector('[name="rk'+i+'"]')||{}).value||0;
+    const w=b>0&&jin>0?b*jin:0;ws.push(w);wsum+=w}
+  const tv=f.querySelector("#recipe_total_val"),ts=f.querySelector("#recipe_total_show");
+  if(wsum>0){if(tv)tv.value=r2(wsum);if(ts)ts.textContent="";if(ts)ts.value=fmt(r2(wsum))+" 斤/天"}else{if(ts)ts.value="填好下表自动算"}
+  f.querySelectorAll('[name^="rp"]').forEach((el,i)=>{if(ws[i]!==undefined&&wsum>0)el.value=Math.round(ws[i]/wsum*1000)/10})}
+function recipeRowJin(nm,jinInput){ // 斤/单位输入→kg存储
+  return jinInput>0?r2(jinInput/2):(S.unitKg&&S.unitKg[nm]&&Math.max.apply(null,Object.values(S.unitKg[nm])))||bagKgOf(nm)}
+function pctFill(){recipeLive()}
+function saveRecipe(e){e.preventDefault();const d=fd(e.target);
+  // 行→ {item, b(数量), k(kg存储)}: 斤/单位输入÷2存kg; 留空则用该物料入库记过的单位重
+  let wsum=0;const tmp=[];
+  for(let i=0;i<12;i++){const it=(d["ri"+i]||"").trim(),b=+d["rb"+i]||0,jinIn=+d["rk"+i]||0;
+    if(it&&b>0){const k=recipeRowJin(it,jinIn);const w=r2(b*k*2);tmp.push({item:it,b,k,w});wsum+=r2(w)}}
+  if(!(wsum>0)){alert("至少填一行: 品种+数量(斤/单位留空则按入库时记的重量)");return}
+  const t=r2(wsum); // 总耗料自动=Σ(数量×每单位斤数)
+  const rows=tmp.map(x=>({item:x.item,pct:r2(x.w/wsum*100),b:x.b,k:x.k}));
+  S.recipe={total:t,rows,per:+d.per||r2(t/stockCount()*10),enabled:true,since:(S.recipe&&S.recipe.since)||today()};
+  RECIPE_DRAFT=null;touchSave();
+  syncMsg(`✅ 配方已存: 每日总耗 ${fmt(t)} 斤 = `+rows.map(r=>`${r.item}${fmt(r.pct)}%`).join(" + "));render()}
 function recipeToggle(){S.recipe.enabled=!S.recipe.enabled;touchSave();render()}
 function runConsume(){ // 手动"记今日消耗"(补记/重记今日; 自动消耗在启动时做)
   const R=recipeGet();if(!R.enabled||!(R.total>0)||!R.rows.length){alert("请先设置配方并启用");return}
   if(!(stockOn(today())>0)){alert("今日没有存栏(鸡未上或已清栏), 不记饲料消耗");return}
-  consumeDay(today(),true);render()}
+  if(!consumeDay(today(),true)){alert("账上物料不够今日消耗(有品种库存不足), 未记账。请先入库缺的料 — 这是防错账的保护。");return}
+  syncMsg("✅ 已记今日消耗 "+fmt(R.total)+" 斤");render()}
 function bookStart(){ // 记账起点: 自动补记只认 max(配方起始日, 首笔真实入库日) — 账没开始前的日子一律不补
   const first=S.feedLog.filter(r=>r.dir&&r.dir.startsWith("入")&&!r.auto).map(r=>r.date).sort()[0];
   const since=S.recipe&&S.recipe.since;
@@ -351,10 +362,10 @@ function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当
   const tag=`自动消耗 ${day.slice(5).replace("-","/")}`;
   // 先试算: 任何物料扣后透支(账上没那么多) → 整日不记, 防止"无中生有的历史扣减"吃掉新入库
   const trial={};Object.assign(trial,S.feedStock);
-  for(const row of R.rows){const jin=r2(R.total*row.pct/100);if(jin<=0)continue;
+  for(const row of R.rows){const jin=(row.b&&row.k)?r2(row.b*row.k*2):r2(R.total*row.pct/100);if(jin<=0)continue;
     if(r2((trial[row.item]||0)-jin)<0)return false; // 透支: 不记, 等真入库后自然恢复
     trial[row.item]=r2((trial[row.item]||0)-jin)}
-  R.rows.forEach(row=>{const jin=r2(R.total*row.pct/100);if(jin<=0)return;
+  R.rows.forEach(row=>{const jin=(row.b&&row.k)?r2(row.b*row.k*2):r2(R.total*row.pct/100);if(jin<=0)return;
     S.feedStock[row.item]=r2((S.feedStock[row.item]||0)-jin);
     S.feedLog.push({id:uid(),date:day,item:row.item,dir:"出库(饲喂)",qty:jin,unit:"斤",jin,auto:true,note:tag})});
   S.consume[day]=true;touchSave();return true}
@@ -521,21 +532,22 @@ function flockTable(){if(!S.flock.length)return `<div class="empty">还没有记
 function vFeed(){
   const R=recipeGet();const stock=stockCount();
   const inv=feedInv();const ia=invAlerts();
-  const rRows=draftRows().map((r,i)=>`<tr><td style="padding:4px 3px"><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:100%;max-width:96px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包/桶" style="width:42px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="kg" style="width:38px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rp${i}" type="number" step="0.1" value="${r.pct===""?"":Math.round(r.pct*10)/10}" placeholder="%" style="width:42px"> <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行" style="padding:4px 7px">✕</button></td></tr>`).join("");
+  const rRows=draftRows().map((r,i)=>`<tr><td style="padding:4px 3px"><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:100%;max-width:96px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" oninput="recipeLive()" placeholder="包/桶" style="width:42px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rk${i}" type="number" step="0.1" value="${r.k?Math.round(r.k*10)/10:""}" oninput="recipeLive()" placeholder="斤" style="width:44px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rp${i}" type="text" value="${r.pct===""?"":Math.round(r.pct*10)/10}" readonly placeholder="%" style="width:42px;background:#F2F0E9"> <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行" style="padding:4px 7px">✕</button></td></tr>`).join("");
   const recipeHtml=`
   <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
   ${R.total>0?`<div style="margin-bottom:8px"><span class="tag ${R.enabled?'s':'w'}">${R.enabled?"● 启用中":"⏸ 已停用"}</span> 每日 <b>${fmt(R.total)}</b> 斤${R.per?` · 折合 <b>${R.per}</b> 两/只·天(存栏${fmt(stock)}只)`:""} <button class="mini" onclick="recipeToggle()">${R.enabled?"停用":"启用"}</button></div>`:""}
   <form onsubmit="saveRecipe(event)">
-    <div class="field"><label>每日总耗料(斤)</label><input type="number" step="0.01" name="total" value="${R.total||""}" placeholder="如 2200" required></div>
+    <div class="field"><label>每日总耗料(斤) — 自动=各行包数×每包斤数</label><input type="text" id="recipe_total_show" value="${R.total?fmt(R.total)+" 斤/天":"填好下表自动算"}" readonly style="background:#F2F0E9;font-weight:bold"></div>
     <div class="field"><label>每只日耗(两/只, 可不填)</label><input type="number" step="0.01" name="per" value="${R.per||""}" placeholder="如 2.2, 填了只作参考显示"></div>
-    <table style="margin:4px 0;table-layout:fixed"><tr><th style="width:32%">品种</th><th style="width:22%">数量</th><th style="width:22%">kg/单位</th><th style="width:24%">占比%</th></tr>
+    <input type="hidden" name="total" id="recipe_total_val" value="${R.total||""}">
+    <table style="margin:4px 0;table-layout:fixed"><tr><th style="width:30%">品种</th><th style="width:20%">数量</th><th style="width:22%">斤/单位</th><th style="width:24%">占比%</th></tr>
       ${rRows}
     </table>
     <button type="button" class="mini" onclick="pctFill()">⚖️ 按包数折算占比</button> <button type="button" class="mini" onclick="recipeAddRow()">➕ 加一个品种</button>
     <datalist id="feed_items_dl">${FEED_ITEMS.map(i=>`<option value="${i}">`).join("")}</datalist>
     <button class="go">保存配方</button>
   </form>
-  <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空则用该物料入库时记下的包重, 没记过按默认${bagKg()}kg), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天), 只记有鸡的日子: 当天存栏大于0才记, 上鸡日之前的不会再记。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>`;
+  <div class="hint">各行填「品种+数量」, 「斤/单位」留空则按该物料入库时记的重量(包重/桶重), 全部填好自动算总耗料和占比。「⚖️按包数折算」可手动刷新。每天消耗=总耗料×各行占比, 自动出库(打开App时补记, 最多补7天), 只记有鸡的日子。存栏变了直接改各行的数量就行。</div></section>`;
   return recipeHtml+`<section class="panel"><h2>📦 库存一览</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
     ${stockRowsHTML()}
