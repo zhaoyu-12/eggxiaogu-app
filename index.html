@@ -329,35 +329,52 @@ function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
   if(!rows.length){alert("至少填一行品种");return}
   if(Math.abs(sum-100)>0.5&&!confirm(`品种占比合计 ${sum}%, 不是100%, 仍要保存吗?(系统会按比例折算)`))return;
   rows.forEach(r=>r.pct=r.pct/sum*100);
-  S.recipe={total:t,rows,per:+d.per||r2(t/stockCount()*10),enabled:true};RECIPE_DRAFT=null;touchSave();render()}
+  S.recipe={total:t,rows,per:+d.per||r2(t/stockCount()*10),enabled:true,since:(S.recipe&&S.recipe.since)||today()};RECIPE_DRAFT=null;touchSave();render()}
 function recipeToggle(){S.recipe.enabled=!S.recipe.enabled;touchSave();render()}
 function runConsume(){ // 手动"记今日消耗"(补记/重记今日; 自动消耗在启动时做)
   const R=recipeGet();if(!R.enabled||!(R.total>0)||!R.rows.length){alert("请先设置配方并启用");return}
   if(!(stockOn(today())>0)){alert("今日没有存栏(鸡未上或已清栏), 不记饲料消耗");return}
   consumeDay(today(),true);render()}
+function bookStart(){ // 记账起点: 自动补记只认 max(配方起始日, 首笔真实入库日) — 账没开始前的日子一律不补
+  const first=S.feedLog.filter(r=>r.dir&&r.dir.startsWith("入")&&!r.auto).map(r=>r.date).sort()[0];
+  const since=S.recipe&&S.recipe.since;
+  if(first&&since)return first>since?first:since;
+  return since||first||""}
 function consumeDay(day,force){ // 把 day 的消耗折成一组出库流水(当日已有则跳过, force 则先撤旧)
   const R=recipeGet();if(!(R.total>0)||!R.rows.length)return false;
+  const bs=bookStart();if(bs&&day<bs)return false; // 记账起点之前不补记
   const st=stockOn(day); // 当天存栏(此日前所有栏群变动合计)
   const old=S.feedLog.filter(r=>r.auto&&r.date===day);
   if(old.length){old.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
     S.feedLog=S.feedLog.filter(r=>!(r.auto&&r.date===day))}
   if(!(st>0))return false; // 鸡未上/已清栏: 不记消耗, 不标记(日后补录上鸡会自动再判)
   const tag=`自动消耗 ${day.slice(5).replace("-","/")}`;
+  // 先试算: 任何物料扣后透支(账上没那么多) → 整日不记, 防止"无中生有的历史扣减"吃掉新入库
+  const trial={};Object.assign(trial,S.feedStock);
+  for(const row of R.rows){const jin=r2(R.total*row.pct/100);if(jin<=0)continue;
+    if(r2((trial[row.item]||0)-jin)<0)return false; // 透支: 不记, 等真入库后自然恢复
+    trial[row.item]=r2((trial[row.item]||0)-jin)}
   R.rows.forEach(row=>{const jin=r2(R.total*row.pct/100);if(jin<=0)return;
     S.feedStock[row.item]=r2((S.feedStock[row.item]||0)-jin);
     S.feedLog.push({id:uid(),date:day,item:row.item,dir:"出库(饲喂)",qty:jin,unit:"斤",jin,auto:true,note:tag})});
   S.consume[day]=true;touchSave();return true}
-function healBad(){ // 撤销"无鸡日"的自动消耗并回收库存(开机与每次云合并后都要跑, 防云端还魂)
-  const bad=S.feedLog.filter(r=>r.auto&&stockOn(r.date)<=0);
+function healBad(){ // 撤销"无鸡日/记账起点前"的自动消耗并回收库存(开机与每次云合并后都要跑, 防云端还魂)
+  const bs=bookStart();
+  // 假扣减判定: 按日期序重放库存, 自动扣导致该物料累计<0 的整日扣减都算"无中生有", 撤销
+  const negDays=new Set();const bal={};
+  S.feedLog.slice().sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0).forEach(r=>{const j=r2(+r.jin||0);if(!j)return;
+    const it=r.item;bal[it]=r2((bal[it]||0)+((r.dir||"").startsWith("出")?-j:j));
+    if(r.auto&&(r.dir||"").startsWith("出")&&bal[it]<0)negDays.add(r.date)});
+  const bad=S.feedLog.filter(r=>r.auto&&(stockOn(r.date)<=0||(bs&&r.date<bs)||negDays.has(r.date)));
   if(!bad.length)return 0;
   bad.forEach(r=>{S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+r.jin)});
   const bd=new Set(bad.map(r=>r.date));S.feedLog=S.feedLog.filter(r=>!(r.auto&&bd.has(r.date)));
   bd.forEach(ds=>{delete S.consume[ds]});return bad.length}
 function backfillConsume(){ // 启动时补齐上次用到今天的每日消耗(每次打开最多补7天, 再久提示手动核)
-  healBad();
+  if(healBad()>0){save();render()}
   const R=recipeGet();if(!S.recipe||!R.enabled||!(R.total>0)||!R.rows.length)return;
   const days=[];const d=new Date();
-  for(let i=0;i<7;i++){const ds=today();d.setDate(d.getDate()-1);const dd=new Date(d);const ds2=dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");if(!S.consume[ds2])days.push(ds2)}
+  for(let i=0;i<7;i++){const dd=new Date(d);const ds2=dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");if(!S.consume[ds2])days.push(ds2);d.setDate(d.getDate()-1)}
   days.reverse().forEach(day=>consumeDay(day,false))}
 function feedInv(){ // 库存盘查: 每品种库存/日耗/可撑天数
   const R=recipeGet();const daily={};R.rows.forEach(r=>daily[r.item]=R.total*r.pct/100);
