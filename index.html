@@ -118,7 +118,7 @@ let S=load();
 function load(){try{const r=localStorage.getItem(KEY);return r?Object.assign(JSON.parse(JSON.stringify(EMPTY)),JSON.parse(r)):JSON.parse(JSON.stringify(EMPTY))}catch(e){return JSON.parse(JSON.stringify(EMPTY))}}
 function save(){localStorage.setItem(KEY,JSON.stringify(S))}
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-const today=()=>new Date().toISOString().slice(0,10);
+const today=()=>{const d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 const r2=n=>Math.round(n*100)/100;
 const fmt=n=>{const v=+n;return (v<0?"-":"")+Math.abs(v).toLocaleString("zh-CN",{maximumFractionDigits:2})};
 const monthOf=d=>d.slice(0,7);
@@ -266,9 +266,42 @@ if(tab==="more"){ // 恢复"更多"页已展开的折叠区 (状态存全局, �
 function stockCount(){return S.flock.reduce((a,r)=>a+r.qty,0)}
 function stockOn(day){return S.flock.reduce((a,r)=>a+(r.date<=day?+r.qty:0),0)}
 function bagKg(){const v=+S.bagkg;return v>0?v:50} // 默认包重(kg), 新物料/未记过的用它
+
+// ================= 单位体系 v2: 自定义单位(桶/袋...) + 单价随单位 =================
+function unitDefs(){ // 全量单位表: [名, 折斤系数]  斤=1 公斤=2 吨=2000; 包/桶/袋=按物料记忆或默认
+  const base=[["斤",1],["公斤",2],["吨",2000]];
+  const cus=(S.units||[]).map(u=>[u.name,0]); // 系数0=按物料记"每单位kg"
+  return base.concat(cus)}
+function unitIsCustom(n){return ["斤","公斤","吨","包"].indexOf(n)<0}
+function unitJinOf(item,unit){ // 单位→斤 (用于库存折算); 自定义单位靠 S.unitKg[item][unit]=每单位kg
+  if(unit==="斤")return 1; if(unit==="公斤")return 2; if(unit==="吨")return 2000;
+  if(unit==="包")return bagKgOf(item)*2;
+  const kg=(S.unitKg&&S.unitKg[item]&&S.unitKg[item][unit])||0;
+  return kg>0?kg*2:0}
+function rememberUnitKg(item,unit,kg){S.unitKg=S.unitKg||{};S.unitKg[item]=S.unitKg[item]||{};S.unitKg[item][unit]=+kg}
+function mainUnitOf(item){ // 物料的主单位: 最近一次入库用的单位; 没有则"斤"
+  const r=[...S.feedLog].reverse().find(x=>x.item===item&&x.dir&&x.dir.startsWith("入"));
+  return (r&&r.unit)||"斤"}
 function bagKgOf(item){const m=(S.bagKgMap||{})[item];return (+m>0)?+m:bagKg()} // 物料自己的包重优先
 function rememberBagKg(item,kg){if(!item||!(kg>0))return;S.bagKgMap=S.bagKgMap||{};S.bagKgMap[item]=kg}
-function feedUnitUI(sel){const f=document.getElementById("bagkg_field");if(f)f.style.display=sel.value==="包"?"":"none";const selItem=document.querySelector('select[name="item"]');if(selItem)feedItemTipFromForm(selItem)}
+function unitOptsHTML(){return unitDefs().map(u=>`<option value="${u[0]}">${u[0]}</option>`).join('')+'<option value="__newunit__">➕ 新建单位…</option>'}
+function feedUnitUI(sel){
+  const f=sel.closest("form");if(!f)return;
+  const bag=f.querySelector("#bagkg_field");const uk=f.querySelector("#unitkg_field");
+  if(sel.value==="__newunit__"){
+    const nm=prompt("新单位名称(如: 桶/袋/车):");if(!nm){sel.value="斤";feedUnitUI(sel);return}
+    nm.trim();
+    if(unitDefs().some(u=>u[0]===nm.trim())){alert("这个单位已经有了");sel.value="斤";feedUnitUI(sel);return}
+    S.units=S.units||[];S.units.push({name:nm.trim()});save();
+    const opt=document.createElement("option");opt.value=nm.trim();opt.textContent=nm.trim();
+    sel.insertBefore(opt,sel.querySelector('option[value="__newunit__"]'));sel.value=nm.trim();
+  }
+  const v=sel.value;
+  if(bag)bag.style.display=v==="包"?"":"none";
+  if(uk)uk.style.display=(v==="包"||unitIsCustom(v))?"":"none";
+  const lb=f.querySelector("#price_label");if(lb)lb.textContent="单价(元/"+v+")";
+  const ukIn=f.querySelector('[name="unitkg"]');if(ukIn)ukIn.placeholder=v==="包"?"每包重量(kg)":"每"+v+"重量(kg)";
+  const selItem=f.querySelector('select[name="item"]');if(selItem)feedItemTipFromForm(selItem)}
 function feedItemTipFromForm(sel){const f=sel.closest("form");const c=f.querySelector('[name="item_c"]');const v=sel.value==="__custom__"?(c&&c.value.trim()||""):sel.value;const m=(S.bagKgMap||{})[v];const el=f.querySelector("#feed_bagkg");if(m>0&&el)el.value=m} // 选物料自动带出记忆包重
 function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
 function salesAmt(r){return r2(r.qty*r.price)}
@@ -282,13 +315,16 @@ function draftRows(){if(!RECIPE_DRAFT)RECIPE_DRAFT=(S.recipe&&S.recipe.rows.leng
 function harvestDraft(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f||!RECIPE_DRAFT)return;const v={};new FormData(f).forEach((x,k)=>v[k]=x);RECIPE_DRAFT.forEach((r,i)=>{r.item=v["ri"+i]||"";r.b=v["rb"+i]||"";r.k=v["rk"+i]||"";r.pct=v["rp"+i]||""})}
 function recipeAddRow(){const d=draftRows();harvestDraft();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
 function recipeDelRow(i){const d=draftRows();harvestDraft();d.splice(i,1);render()}
-function pctFill(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;const d=fd(f);let wsum=0;const w=[];for(let i=0;i<12;i++){const b=+d["rb"+i]||0,nm=(d["ri"+i]||"").trim(),k=+d["rk"+i]||(nm?bagKgOf(nm):bagKg());w.push(b*k);wsum+=b*k}
-  if(!(wsum>0)){alert("先在各行填包数(千克/包留空默认50)");return}
+function rowUnitKg(nm,k){if(k>0)return k; // 手填kg优先
+  if(S.unitKg&&S.unitKg[nm]){const ks=Object.values(S.unitKg[nm]);if(ks.length)return Math.max.apply(null,ks)} // 该物料记过的最大单位重
+  return bagKgOf(nm)}
+function pctFill(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f)return;const d=fd(f);let wsum=0;const w=[];for(let i=0;i<12;i++){const b=+d["rb"+i]||0,nm=(d["ri"+i]||"").trim(),k=rowUnitKg(nm,+d["rk"+i]||0);w.push(b*k);wsum+=b*k}
+  if(!(wsum>0)){alert("先在各行填数量(每单位kg留空则按该物料入库时记的重量)");return}
   f.querySelectorAll('[name^="rp"]').forEach((el,i)=>{if(w[i]!==undefined)el.value=Math.round(w[i]/wsum*1000)/10});}
 function saveRecipe(e){e.preventDefault();const d=fd(e.target);const t=+d.total;
   if(!(t>0)){alert("每日总耗料要大于0");return}
-  let rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||0;if(it&&pc>0)rows.push({item:it,pct:pc,b:b||undefined,k:b?(k||bagKgOf(it)):undefined})}
-  if(!rows.length){let wsum=0;const tmp=[];for(let i=0;i<12;i++){const it=d["ri"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||bagKgOf(it);if(it&&b>0){const w=b*k;tmp.push({item:it,w,b,k});wsum+=w}}if(wsum>0)tmp.forEach(x=>rows.push({item:x.item,pct:r2(x.w/wsum*100),b:x.b,k:x.k}))}
+  let rows=[];for(let i=0;i<12;i++){const it=d["ri"+i],pc=+d["rp"+i],b=+d["rb"+i]||0,k=+d["rk"+i]||0;if(it&&pc>0)rows.push({item:it,pct:pc,b:b||undefined,k:b?rowUnitKg(it,k):undefined})}
+  if(!rows.length){let wsum=0;const tmp=[];for(let i=0;i<12;i++){const it=d["ri"+i],b=+d["rb"+i]||0,k=rowUnitKg(it,+d["rk"+i]||0);if(it&&b>0){const w=b*k;tmp.push({item:it,w,b,k});wsum+=w}}if(wsum>0)tmp.forEach(x=>rows.push({item:x.item,pct:r2(x.w/wsum*100),b:x.b,k:x.k}))}
   const sum=rows.reduce((a,r)=>a+r.pct,0);
   if(!rows.length){alert("至少填一行品种");return}
   if(Math.abs(sum-100)>0.5&&!confirm(`品种占比合计 ${sum}%, 不是100%, 仍要保存吗?(系统会按比例折算)`))return;
@@ -321,7 +357,7 @@ function backfillConsume(){ // 启动时补齐上次用到今天的每日消耗(
   healBad();
   const R=recipeGet();if(!S.recipe||!R.enabled||!(R.total>0)||!R.rows.length)return;
   const days=[];const d=new Date();
-  for(let i=0;i<7;i++){const ds=d.toISOString().slice(0,10);if(!S.consume[ds])days.push(ds);d.setDate(d.getDate()-1)}
+  for(let i=0;i<7;i++){const ds=today();d.setDate(d.getDate()-1);const dd=new Date(d);const ds2=dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");if(!S.consume[ds2])days.push(ds2)}
   days.reverse().forEach(day=>consumeDay(day,false))}
 function feedInv(){ // 库存盘查: 每品种库存/日耗/可撑天数
   const R=recipeGet();const daily={};R.rows.forEach(r=>daily[r.item]=R.total*r.pct/100);
@@ -339,7 +375,7 @@ function vaxAlerts(){const out=[];const t=today();
   // 来自免疫档案的下次免疫
   for(const v of S.vaccines){if(!v.next)continue;if(v.next<t)out.push({...v,due:v.next,lvl:"w",txt:`已到期 ${v.next} · ${v.name}`});else{const dd=Math.round((new Date(v.next)-new Date(t))/864e5);if(dd<=7)out.push({...v,due:v.next,lvl:"s",txt:`${dd===0?"今天":dd+"天后"} ${v.next} · ${v.name}`})}}
   return out.sort((a,b)=>a.due<b.due?-1:1)}
-const addDays=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.toISOString().slice(0,10)};
+const addDays=(iso,n)=>{const d=new Date(iso+"T00:00:00");d.setDate(d.getDate()+n);return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")};
 function planAge(){if(!S.plan||!S.plan.start)return null;return Math.round((new Date(today()+"T00:00:00")-new Date(S.plan.start+"T00:00:00"))/864e5)}
 function planDoneCount(){return S.plan&&S.plan.done?S.plan.done.length:0}
 
@@ -428,7 +464,7 @@ function vDash(){
     ${alerts.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl==="w"?"r":"w"}">${a.lvl==="w"?"过期":"疫苗"}</span> ${a.txt}</div>`).join("")}
   </section>`:""}
   <section class="panel"><h2>🌾 饲料库存</h2>
-    <table><tr><th>物料</th><th>当前库存</th><th>折包</th></tr>${stockRows}</table>
+    <table><tr><th>物料</th><th>当前库存</th><th>折主单位</th></tr>${stockRows}</table>
   </section>
   <section class="panel"><h2>🥚 本月销售明细</h2>${salesTable(m,true)}</section>`;
 }
@@ -472,14 +508,14 @@ function vFeed(){
   const invRows=inv.map(x=>{
     const bags=Math.round(x.st/(bagKgOf(x.item)*2)*10)/10;
     return `<tr><td>${x.item}</td><td class="money ${x.st<0?'neg':''}">${fmt(x.st)}斤</td><td class="money">${x.st>=0?bags+"包":""}</td><td class="money">${x.daily?fmt(r2(x.daily))+"斤/天":"—"}</td><td>${dc(x)}</td></tr>`}).join("");
-  const rRows=draftRows().map((r,i)=>`<tr><td style="padding:4px 3px"><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:100%;max-width:96px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包" style="width:42px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="${bagKg()}" style="width:38px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rp${i}" type="number" step="0.1" value="${r.pct===""?"":Math.round(r.pct*10)/10}" placeholder="%" style="width:42px"> <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行" style="padding:4px 7px">✕</button></td></tr>`).join("");
+  const rRows=draftRows().map((r,i)=>`<tr><td style="padding:4px 3px"><input name="ri${i}" list="feed_items_dl" value="${r.item}" placeholder="品种名" style="width:100%;max-width:96px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rb${i}" type="number" step="0.01" value="${r.b||""}" placeholder="包/桶" style="width:42px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rk${i}" type="number" step="0.1" value="${r.k||""}" placeholder="kg" style="width:38px"></td><td style="white-space:nowrap;padding:4px 2px"><input name="rp${i}" type="number" step="0.1" value="${r.pct===""?"":Math.round(r.pct*10)/10}" placeholder="%" style="width:42px"> <button type="button" class="del" onclick="recipeDelRow(${i})" title="删这行" style="padding:4px 7px">✕</button></td></tr>`).join("");
   const recipeHtml=`
   <section class="panel"><h2>🧮 混合料配方(每日自动出库)</h2>
   ${R.total>0?`<div style="margin-bottom:8px"><span class="tag ${R.enabled?'s':'w'}">${R.enabled?"● 启用中":"⏸ 已停用"}</span> 每日 <b>${fmt(R.total)}</b> 斤${R.per?` · 折合 <b>${R.per}</b> 两/只·天(存栏${fmt(stock)}只)`:""} <button class="mini" onclick="recipeToggle()">${R.enabled?"停用":"启用"}</button></div>`:""}
   <form onsubmit="saveRecipe(event)">
     <div class="field"><label>每日总耗料(斤)</label><input type="number" step="0.01" name="total" value="${R.total||""}" placeholder="如 2200" required></div>
     <div class="field"><label>每只日耗(两/只, 可不填)</label><input type="number" step="0.01" name="per" value="${R.per||""}" placeholder="如 2.2, 填了只作参考显示"></div>
-    <table style="margin:4px 0;table-layout:fixed"><tr><th style="width:32%">品种</th><th style="width:22%">包数</th><th style="width:22%">kg/包</th><th style="width:24%">占比%</th></tr>
+    <table style="margin:4px 0;table-layout:fixed"><tr><th style="width:32%">品种</th><th style="width:22%">数量</th><th style="width:22%">kg/单位</th><th style="width:24%">占比%</th></tr>
       ${rRows}
     </table>
     <button type="button" class="mini" onclick="pctFill()">⚖️ 按包数折算占比</button> <button type="button" class="mini" onclick="recipeAddRow()">➕ 加一个品种</button>
@@ -489,7 +525,7 @@ function vFeed(){
   <div class="hint">可以只填包数不填占比: 各行填「包数」(千克/包留空则用该物料入库时记下的包重, 没记过按默认${bagKg()}kg), 保存时自动折成占比; 或点「⚖️ 按包数折算占比」先看结果再保存。品种不够就点「➕ 加一个品种」(最多12个)。清单里有玉米/豆粕/预混料/麦麸/石粉/磷酸氢钙/食盐/多维等, 清单外的名字直接打字也行。设好后每天消耗自动出库(打开App时补记, 最多补7天), 只记有鸡的日子: 当天存栏大于0才记, 上鸡日之前的不会再记。上栏量变了改「每日总耗料」就行, 不用天天登记。</div></section>
   <section class="panel"><h2>📊 库存盘查(入库 − 消耗 = 现有)</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
-    <table><tr><th>品种</th><th>现有库存</th><th>折包</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
+    <table><tr><th>品种</th><th>现有库存</th><th>折主单位</th><th>日耗</th><th>可撑</th></tr>${invRows||`<tr><td class="empty">暂无</td></tr>`}</table>
     <div class="hint">黄牌=够吃7天内, 红牌=3天内, 该备料了。库存为负=漏记入库。</div></section>`;
   return recipeHtml+`<section class="panel"><h2>➕ 物料出入库</h2>
   <form onsubmit="addFeed(event)">
@@ -497,23 +533,26 @@ function vFeed(){
     <div class="field"><label>物料名</label>${smartField('item',FEED_ITEMS,'','feedItemTipFromForm(this)')}</div>
     <div class="field"><label>方向</label><select name="dir"><option>入库</option><option>出库(饲喂)</option></select></div>
     <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
-    <div class="field"><label>单位</label><select name="unit" onchange="feedUnitUI(this)">${FEED_UNITS.map(u=>`<option value="${u[0]}">${u[0]}</option>`).join('')}</select></div>
+    <div class="field"><label>单位</label><select name="unit" onchange="feedUnitUI(this)">${unitOptsHTML()}</select></div>
     <div class="field" id="bagkg_field" style="display:none"><label>每包重量(kg)</label><input type="number" step="0.1" min="0.1" name="bagkg" id="feed_bagkg" value="${bagKg()}" placeholder="玉米50/豆粕40各记各的"></div>
-    <div class="field"><label>单价(元/斤)</label><input type="number" step="0.01" name="price"></div>
+    <div class="field" id="unitkg_field" style="display:none"><label>每单位重量(kg)</label><input type="number" step="0.1" min="0.1" name="unitkg" placeholder="如: 一桶40kg"></div>
+    <div class="field"><label id="price_label">单价(元/斤)</label><input type="number" step="0.01" name="price"></div>
     <div class="field"><label>备注</label>${noteField('feed')}</div>
     <button class="go">记账</button>
   </form>
   <div class="hint">入库自动加库存; 出库自动减库存。若同时填了单价和金额, 记得在「收支台账」补一笔支出。</div></section>
   <section class="panel"><h2>📦 当前库存</h2>
-  <table><tr><th>物料</th><th>库存(斤)</th><th>折公斤</th><th>折包</th><th>包重</th></tr>${stockRowsHTML()}</table><div class="hint">「折包」按各物料入库时记下的包重各自换算(见「包重」列); 没以包入库过的按默认50kg兜底。账本内部统一按斤累计。</div></section>
+  <table><tr><th>物料</th><th>库存(斤)</th><th>折公斤</th><th>折主单位</th><th>包重</th></tr>${stockRowsHTML()}</table><div class="hint">「折包」按各物料入库时记下的包重各自换算(见「包重」列); 没以包入库过的按默认50kg兜底。账本内部统一按斤累计。</div></section>
   <section class="panel"><h2>📋 出入库流水</h2>${feedTable()}</section>`;
 }
 function stockRowsHTML(){
   const ks=Object.keys(S.feedStock).filter(k=>Math.abs(S.feedStock[k])>0.001);
   ks.sort((a,b)=>Math.abs(S.feedStock[b])-Math.abs(S.feedStock[a]));
   if(!ks.length)return `<tr><td class="empty" colspan="5">暂无</td></tr>`;
-  return ks.map(k=>{const st=S.feedStock[k],kg=Math.round(st/2*10)/10,bags=Math.round(st/(bagKgOf(k)*2)*10)/10;
-    return `<tr><td>${k}</td><td class="money ${st<0?'neg':''}">${fmt(st)}</td><td class="money ${st<0?'neg':''}">${fmt(kg)}</td><td class="money ${st<0?'neg':''}">${bags}包</td><td><small style="color:#888">${bagKgOf(k)}kg/包</small></td></tr>`}).join("")}
+  return ks.map(k=>{const st=S.feedStock[k],kg=Math.round(st/2*10)/10,mu=mainUnitOf(k),uj=unitJinOf(k,mu);
+    const muTxt=uj>0?fmt(Math.round(st/uj*10)/10)+mu:fmt(kg)+"kg";
+    const sub=mu==="包"?`${bagKgOf(k)}kg/包`:(unitIsCustom(mu)&&S.unitKg&&S.unitKg[k]&&S.unitKg[k][mu]?`${S.unitKg[k][mu]}kg/${mu}`:mu==="斤"?"":mu);
+    return `<tr><td>${k}</td><td class="money ${st<0?'neg':''}">${fmt(st)}</td><td class="money ${st<0?'neg':''}">${fmt(kg)}</td><td class="money ${st<0?'neg':''}">${muTxt}</td><td><small style="color:#888">${sub}</small></td></tr>`}).join("")}
 function foldState(key){window.FOLD_TAB=window.FOLD_TAB||{};if(window.FOLD_TAB[key]===undefined)window.FOLD_TAB[key]=0;return window.FOLD_TAB[key]}
 function foldToggle(key){window.FOLD_TAB=window.FOLD_TAB||{};window.FOLD_TAB[key]=(window.FOLD_TAB[key]?0:1);render()}
 function foldRows(list,dateKey,rowFn,sumFn,hintText){ // 通用按日折叠: list已按日期倒序; 返回html(不含table外壳)
@@ -998,16 +1037,17 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   const item=(sel&&sel.value==="__custom__")?(c&&c.value.trim()||""):(sel&&sel.value||""); // smartField取真名
   if(!item){alert("请填写物料名");return}
   const qty=+d.qty;if(!(qty>0)){alert("数量要大于0");return}
-  const kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);
-  const jin=(d.unit==="包")?r2(qty*kgo*2):r2(qty*(FEED_UNITS.find(x=>x[0]===d.unit)||[0,1])[1]);
-  if(d.unit==="包")rememberBagKg(item,kgo);
+  let jin=0;
+  if(d.unit==="包"){const kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);if(!(kgo>0)){alert("请填写每包重量");return}jin=r2(qty*kgo*2);rememberBagKg(item,kgo)}
+  else if(unitIsCustom(d.unit)){const uk=+d.unitkg;if(!(uk>0)){alert(`请填写每${d.unit}重量(kg)`);return}jin=r2(qty*uk*2);rememberUnitKg(item,d.unit,uk)}
+  else {jin=r2(qty*(unitJinOf(item,d.unit)||1))}
   const out=d.dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(out?-jin:jin));
   if(S.feedStock[item]<0&&!confirm(`${item}库存将变为${S.feedStock[item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[item]=r2(S.feedStock[item]+(out?jin:-jin));return}
-  S.feedLog.push({id:uid(),date:d.date,item,dir:d.dir,qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${kgo}kg`:"")+(d.note?" "+d.note:"")});
+  S.feedLog.push({id:uid(),date:d.date,item,dir:d.dir,qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${S.unitKg&&S.unitKg[item]&&bagKgOf(item)||""}kg`:(unitIsCustom(d.unit)&&d.unitkg?`每${d.unit}${d.unitkg}kg`:""))+(d.note?" "+d.note:"")});
   touchSave();
-  syncMsg(`✅ 已记账: ${d.date} ${item} ${out?"出":"入"}库 ${qty}${d.unit}(${fmt(jin)}斤)${d.unit==="包"?`, 每包${kgo}kg`:""}`);
+  syncMsg(`✅ 已记账: ${d.date} ${item} ${out?"出":"入"}库 ${qty}${d.unit}(${fmt(jin)}斤)${(d.unit==="包"&&d.bagkg)?`, 每包${d.bagkg}kg`:(unitIsCustom(d.unit)&&d.unitkg?`, 每${d.unit}${d.unitkg}kg`:"")}`);
   f.reset();f.querySelector('[name="date"]').value=today();
-  const bg=f.querySelector("#bagkg_field");if(bg)bg.style.display="none";
+  const bg=f.querySelector("#bagkg_field");if(bg)bg.style.display="none";const ukf=f.querySelector("#unitkg_field");if(ukf)ukf.style.display="none";const pl=f.querySelector("#price_label");if(pl)pl.textContent="单价(元/斤)";
   render()}
 function addFin(e){e.preventDefault();const d=fd(e.target);S.finance.push({id:uid(),...d,amount:r2(+d.amount),pay:d.pay||"paid"});touchSave();render()}
 function addSale(e){e.preventDefault();const d=fd(e.target);const rec={id:uid(),...d,qty:+d.qty,price:+d.price,pay:d.pay||"paid"};if(+d.mkt)rec.mkt=+d.mkt;S.sales.push(rec);touchSave();
