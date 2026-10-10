@@ -560,6 +560,20 @@ function vFeed(){
     <div class="hint">结余按你入库时的记法显示(包/桶/袋); 黄牌=够吃7天内, 红牌=3天内。账本内部按斤累计, 流水可核每笔。</div></section>
   <section class="panel"><h2>📋 出入库流水</h2>${feedTable()}</section>`;
 }
+function perUnitJin(item,unit){ // 该物料某单位的实际斤重: 流水回放 > 单位记忆 > 包重记忆 > 默认
+  let sj=0,sq=0;
+  S.feedLog.forEach(r=>{if(r.item===item&&r.unit===unit&&r.dir&&r.dir.startsWith("入")&&+r.qty>0&&+r.jin>0){sj+=+r.jin;sq+=+r.qty}});
+  if(sq>0&&sj>0)return r2(sj/sq);
+  if(unit==="包")return bagKgOf(item)*2;
+  if(unitIsCustom(unit)){const kg=S.unitKg&&S.unitKg[item]&&S.unitKg[item][unit];return kg>0?kg*2:0}
+  if(unit==="公斤")return 2;if(unit==="吨")return 2000;
+  return 1}
+function unitJinOf(item,unit){ // 优先流水推算
+  const p=perUnitJin(item,unit);if(p>0&&p!==1)return p;
+  if(unit==="斤")return 1;if(unit==="公斤")return 2;if(unit==="吨")return 2000;
+  if(unit==="包")return bagKgOf(item)*2;
+  const kg=S.unitKg&&S.unitKg[item]&&S.unitKg[item][unit];
+  return kg>0?kg*2:0}
 function stockRowsHTML(){ // 库存一览: 结余按入库主单位显示, 附日耗/可撑 (v15 合并版)
   const R=recipeGet();const daily={};R.rows.forEach(r=>daily[r.item]=R.total*r.pct/100);
   const ks=Object.keys(S.feedStock).filter(k=>Math.abs(S.feedStock[k])>0.001);
@@ -568,7 +582,8 @@ function stockRowsHTML(){ // 库存一览: 结余按入库主单位显示, 附�
   return `<table><tr><th>物料</th><th>结余</th><th>状态</th></tr>`+ks.map(k=>{
     const st=S.feedStock[k],mu=mainUnitOf(k),uj=unitJinOf(k,mu);
     const muTxt=uj>0?fmt(Math.round(st/uj*10)/10)+"<small>"+mu+"</small>":fmt(Math.round(st/2*10)/10)+"<small>kg</small>";
-    const sub=mu==="包"?`${bagKgOf(k)}kg/包`:(unitIsCustom(mu)&&S.unitKg&&S.unitKg[k]&&S.unitKg[k][mu]?`${S.unitKg[k][mu]}kg/${mu}`:"");
+    const pu=perUnitJin(k,mu);
+    const sub=pu>0&&mu!=="斤"?(mu==="包"?`${r2(pu/2)}kg/包`:`${r2(pu/2)}kg/${mu}`):"";
     const dl=daily[k]||0;
     const days=dl>0?Math.floor(st/dl*10)/10:null;
     const lamp=st<0?`<span class="tag r">透支</span>`:(days!==null&&days<=3?`<span class="tag r">仅够${days<1?"不足1":days}天</span>`:(days!==null&&days<=7?`<span class="tag w">约${days}天</span>`:(days!==null?`<span class="tag s">够${days}天</span>`:"")));
