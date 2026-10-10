@@ -312,7 +312,7 @@ function recipeGet(){if(!S.recipe)S.recipe={total:0,rows:[],enabled:true};if(!S.
 // 配方编辑行(编辑期间暂存, 与 S.recipe 分离, 保存才生效)
 let RECIPE_DRAFT=null;
 function draftRows(){if(!RECIPE_DRAFT)RECIPE_DRAFT=(S.recipe&&S.recipe.rows.length?[...S.recipe.rows.map(r=>({...r}))]:[{item:"",pct:""},{item:"",pct:""},{item:"",pct:""}]).slice(0,12);return RECIPE_DRAFT}
-function harvestDraft(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f||!RECIPE_DRAFT)return;const v={};new FormData(f).forEach((x,k)=>v[k]=x);RECIPE_DRAFT.forEach((r,i)=>{r.item=v["ri"+i]||"";r.b=v["rb"+i]||"";r.k=v["rk"+i]||"";r.pct=v["rp"+i]||""})}
+function harvestDraft(){const f=document.querySelector('form[onsubmit="saveRecipe(event)"]');if(!f||!RECIPE_DRAFT)return;const v={};new FormData(f).forEach((x,k)=>v[k]=x);RECIPE_DRAFT.forEach((r,i)=>{r.item=v["ri"+i]||"";r.b=v["rb"+i]||"";const jv=parseFloat(v["rk"+i]);r.k=(jv>0)?r2(jv/2):(v["rk"+i]||"");r.pct=v["rp"+i]||""})}
 function recipeAddRow(){const d=draftRows();harvestDraft();if(d.length>=12){alert("最多12个品种, 够配预混料了 :)");return}d.push({item:"",pct:""});render()}
 function recipeDelRow(i){const d=draftRows();harvestDraft();d.splice(i,1);render()}
 function rowUnitKg(nm,k){if(k>0)return k; // 手填kg优先
