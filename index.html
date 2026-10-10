@@ -268,8 +268,8 @@ function stockOn(day){return S.flock.reduce((a,r)=>a+(r.date<=day?+r.qty:0),0)}
 function bagKg(){const v=+S.bagkg;return v>0?v:50} // 默认包重(kg), 新物料/未记过的用它
 
 // ================= 单位体系 v2: 自定义单位(桶/袋...) + 单价随单位 =================
-function unitDefs(){ // 全量单位表: [名, 折斤系数]  斤=1 公斤=2 吨=2000; 包/桶/袋=按物料记忆或默认
-  const base=[["斤",1],["公斤",2],["吨",2000]];
+function unitDefs(){ // 全量单位表: [名, 折斤系数]  斤=1 公斤=2 吨=2000 包/桶/袋=按物料记忆或默认
+  const base=[["斤",1],["公斤",2],["吨",2000],["包",0]];
   const cus=(S.units||[]).map(u=>[u.name,0]); // 系数0=按物料记"每单位kg"
   return base.concat(cus)}
 function unitIsCustom(n){return ["斤","公斤","吨","包"].indexOf(n)<0}
@@ -1060,7 +1060,7 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   else {jin=r2(qty*(unitJinOf(item,d.unit)||1))}
   const out=d.dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(out?-jin:jin));
   if(S.feedStock[item]<0&&!confirm(`${item}库存将变为${S.feedStock[item]}斤(负数, 可能漏记了入库), 仍要继续吗?`)){S.feedStock[item]=r2(S.feedStock[item]+(out?jin:-jin));return}
-  S.feedLog.push({id:uid(),date:d.date,item,dir:d.dir,qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${S.unitKg&&S.unitKg[item]&&bagKgOf(item)||""}kg`:(unitIsCustom(d.unit)&&d.unitkg?`每${d.unit}${d.unitkg}kg`:""))+(d.note?" "+d.note:"")});
+  S.feedLog.push({id:uid(),date:d.date,item,dir:d.dir,qty,unit:d.unit||"斤",jin,price:d.price,note:(d.unit==="包"?`每包${kgo}kg`:(unitIsCustom(d.unit)&&d.unitkg?`每${d.unit}${d.unitkg}kg`:""))+(d.note?" "+d.note:"")});
   touchSave();
   syncMsg(`✅ 已记账: ${d.date} ${item} ${out?"出":"入"}库 ${qty}${d.unit}(${fmt(jin)}斤)${(d.unit==="包"&&d.bagkg)?`, 每包${d.bagkg}kg`:(unitIsCustom(d.unit)&&d.unitkg?`, 每${d.unit}${d.unitkg}kg`:"")}`);
   f.reset();f.querySelector('[name="date"]').value=today();
