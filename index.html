@@ -1054,8 +1054,8 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   const item=(sel&&sel.value==="__custom__")?(c&&c.value.trim()||""):(sel&&sel.value||""); // smartField取真名
   if(!item){alert("请填写物料名");return}
   const qty=+d.qty;if(!(qty>0)){alert("数量要大于0");return}
-  let jin=0;
-  if(d.unit==="包"){const kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);if(!(kgo>0)){alert("请填写每包重量");return}jin=r2(qty*kgo*2);rememberBagKg(item,kgo)}
+  let jin=0;let kgo=0;
+  if(d.unit==="包"){kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);if(!(kgo>0)){alert("请填写每包重量");return}jin=r2(qty*kgo*2);rememberBagKg(item,kgo)}
   else if(unitIsCustom(d.unit)){const uk=+d.unitkg;if(!(uk>0)){alert(`请填写每${d.unit}重量(kg)`);return}jin=r2(qty*uk*2);rememberUnitKg(item,d.unit,uk)}
   else {jin=r2(qty*(unitJinOf(item,d.unit)||1))}
   const out=d.dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(out?-jin:jin));
