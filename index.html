@@ -576,6 +576,7 @@ function vFeed(){
   <div class="hint">入库自动加库存; 填了单价自动记支出到收支台账。出库用于纠错(饲喂消耗由配方自动记)。</div></section>
   <section class="panel"><h2>📦 库存一览</h2><div style="margin:2px 0 6px"><button class="mini" onclick="openingBalance()">⚖️ 期初结转</button> <button class="mini" onclick="hardRecalc()">🔄 库存=流水重算</button> <small style="color:#888">结转=把差额入账; 重算=以流水为唯一真账, 库存全部按流水重计</small></div>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
+    ${(()=>{const ks=[...new Set([...Object.keys(S.feedStock||{}),...S.feedLog.map(r=>r.item)])];const bad=ks.filter(k=>{const f=S.feedLog.filter(r=>r.item===k).reduce((a,r)=>a+((r.dir||"").indexOf("出")===0?-(+r.jin||0):(+r.jin||0)),0);return Math.abs((S.feedStock[k]||0)-f)>0.5});return bad.length?`<div style="margin:6px 0;padding:6px;background:#FFF8E1;border-radius:8px"><b>⚠ 有 ${bad.length} 种物料库存与流水对不上</b> (${bad.slice(0,4).join("、")}${bad.length>4?"等":""}) — 数字含旧版遗留, 点「🔄 库存=流水重算」立即矫正</div>`:""})()}
     ${stockRowsHTML()}
     <div class="hint">结余按你入库时的记法显示(包/桶/袋); 黄牌=够吃7天内, 红牌=3天内。账本内部按斤累计, 流水可核每笔。</div></section>
   <section class="panel"><h2>📋 出入库流水</h2><div style="margin:2px 0 6px"><button class="mini" onclick="backfillFeedFin()">🧾 补记入库支出</button> <small style="color:#888">历史入库没自动记收支的, 点这里一次补齐</small></div>${feedTable()}</section>`;
