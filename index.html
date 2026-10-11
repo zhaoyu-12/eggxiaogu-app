@@ -1209,6 +1209,9 @@ function delRow(arr,id){if(!confirm("删除这条记录?"))return;
     const fin=S.finance.find(x=>x.src==="feed:"+id);
     if(fin&&!confirm(`这笔入库对应一笔自动支出(¥${fmt(fin.amount)}), 一并删除吗?\n确定=两者都删, 取消=只删流水(保留支出)`))return void delRowKeepFin(id);
     if(fin)S.finance=S.finance.filter(x=>x.src!=="feed:"+id);
+    if(rec&&(rec.note||"").indexOf("期初结转")>=0){ // 删期初结转 → 按流水全量重算库存(账实合一状态下安全)
+      S.feedLog=S.feedLog.filter(r=>r.id!==id);recalcStockFromLog();touchSave();render();
+      syncMsg(`✅ 已撤销「${rec.item}」的期初结转, 库存已按流水重算`);return}
   }
   if(arr==="vaccines"){ // 删免疫流水时, 若它源自计划表, 同步撤销计划进度
     const rec=(S.vaccines||[]).find(r=>r.id===id);
