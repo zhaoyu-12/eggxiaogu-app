@@ -574,7 +574,7 @@ function vFeed(){
     <button class="go">记账</button>
   </form>
   <div class="hint">入库自动加库存; 填了单价自动记支出到收支台账。出库用于纠错(饲喂消耗由配方自动记)。</div></section>
-  <section class="panel"><h2>📦 库存一览</h2>
+  <section class="panel"><h2>📦 库存一览</h2><div style="margin:2px 0 6px"><button class="mini" onclick="openingBalance()">⚖️ 期初结转</button> <small style="color:#888">对账有差额? 一键把历史存量差额记成期初流水, 库存与流水合一</small></div>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
     ${stockRowsHTML()}
     <div class="hint">结余按你入库时的记法显示(包/桶/袋); 黄牌=够吃7天内, 红牌=3天内。账本内部按斤累计, 流水可核每笔。</div></section>
@@ -609,6 +609,28 @@ function stockRowsHTML(){ // 库存一览: 结余按入库主单位显示, 附�
     const lamp=st<0?`<span class="tag r">透支</span>`:(days!==null&&days<=3?`<span class="tag r">仅够${days<1?"不足1":days}天</span>`:(days!==null&&days<=7?`<span class="tag w">约${days}天</span>`:(days!==null?`<span class="tag s">够${days}天</span>`:"")));
     const detail=fmt(st)+"斤"+(sub?` · ${sub}`:"")+(dl>0?` · 日耗${fmt(r2(dl))}斤`:"");
     return `<tr><td><a href="javascript:void(0)" onclick="auditItem('${k}')" style="color:inherit;text-decoration:underline dotted">${k}</a><div style="font-size:11px;color:var(--sub)">${detail}</div></td><td class="money ${st<0?'neg':''}" style="font-size:17px">${muTxt}</td><td>${lamp}</td></tr>`}).join("")+`</table>`}
+function openingBalance(){ // 期初结转: 库存快照与流水差额 → 生成期初流水, 账实合一 (老用户历史数字一次性入账)
+  const items=[...new Set([...Object.keys(S.feedStock||{}), ...S.feedLog.map(r=>r.item)])];
+  const diffs=[];
+  items.forEach(k=>{
+    const snap=r2(S.feedStock[k]||0);
+    const flow=r2(S.feedLog.filter(r=>r.item===k).reduce((a,r)=>a+( (r.dir||"").startsWith("出")?-(+r.jin||0):(+r.jin||0) ),0));
+    if(r2(snap-flow)!==0)diffs.push({item:k,snap,flow,delta:r2(snap-flow)});
+  });
+  if(!diffs.length){syncMsg("账实已合一 — 所有物料库存=流水, 无需结转");return}
+  const msg="以下物料库存与流水有差额 (差额=账外历史存量, 将生成一条「期初结转」流水入账):\n\n"+
+    diffs.map(d=>`· ${d.item}: 库存${fmt(d.snap)} / 流水${fmt(d.flow)} → 结转 ${d.delta>0?"+":""}${fmt(d.delta)}斤`).join("\n")+
+    "\n\n结转后流水=库存, 对账全部平整。继续吗?";
+  if(!confirm(msg))return;
+  const day=(S.bookStart&&S.bookStart.day)||bookStart()||today();
+  let n=0;
+  diffs.forEach(d=>{
+    S.feedLog.push({id:uid(),date:day,item:d.item,dir:d.delta>=0?"入库":"出库",qty:Math.abs(d.delta),unit:"斤",jin:Math.abs(d.delta),note:"期初结转(用App前的历史存量差额)"});
+    n++;
+  });
+  touchSave();render();
+  syncMsg(`✅ 已为期初差额生成 ${n} 条结转流水, 库存与流水现已合一`);
+}
 function auditItem(item){ // 物料对账: 流水汇总 vs 当前库存, 差额一眼可见
   const rows=S.feedLog.filter(r=>r.item===item);
   const jin=r=>r2(+r.jin||0);
@@ -625,7 +647,7 @@ function auditItem(item){ // 物料对账: 流水汇总 vs 当前库存, 差额�
     `──────`,
     `流水合计: ${fmt(calc)}斤 (入${fmt(tin)} - 出${fmt(tout)})`,
     `当前库存: ${fmt(S.feedStock[item]||0)}斤`,
-    calc!==(S.feedStock[item]||0)?`⚠ 差额 ${fmt(r2(calc-(S.feedStock[item]||0)))}斤 — 库存与流水对不上, 请重开App让它重算; 若仍有差额, 截图发给兹白`:((S.feedStock[item]||0)>=0?"✓ 账是平的":`✓ 账是平的 — 负数=消耗>入库, 确实该补货了 (缺 ${fmt(-(S.feedStock[item]||0))}斤)`)
+    calc!==(S.feedStock[item]||0)?`⚠ 差额 ${fmt(r2(calc-(S.feedStock[item]||0)))}斤 — 这块是「账外历史存量」(用流水记账之前的旧数字)。点上方「⚖️期初结转」一键入账, 即可平整`:((S.feedStock[item]||0)>=0?"✓ 账是平的":`✓ 账是平的 — 负数=消耗>入库, 确实该补货了 (缺 ${fmt(-(S.feedStock[item]||0))}斤)`)
   ].filter(Boolean);
   const byDay={};inR.forEach(r=>{byDay[r.date]=(byDay[r.date]||0)+jin(r)});
   const inList=Object.keys(byDay).sort().map(d=>`  ${d} 入 ${fmt(byDay[d])}斤`).join("\n")||"  (无入库记录!)";
