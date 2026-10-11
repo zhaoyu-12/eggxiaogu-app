@@ -1097,16 +1097,28 @@ function addFlock(e){e.preventDefault();const d=fd(e.target);const flid=uid();S.
     S.finance.push({id:uid(),date:d.date,kind:isSell?"收":"支",cat:"鸡苗/淘鸡",item:isSell?"淘鸡收入":"进雏支出",amount:amt,pay:"paid",note:`自动记账 · ${d.type}${Math.abs(+d.qty)}只(${d.house||""})`,src:"flock:"+flid});
     fm=`; 收支台账已自动记${isSell?"收入":"支出"} ¥${fmt(amt)}`}
   touchSave();render()}
-function backfillFeedFin(){ // 补记历史入库的支出(有单价但收支里没有对应记录的)
-  const have=new Set(S.finance.filter(r=>r.src&&r.src.startsWith("feed:")).map(r=>r.src));
-  const missing=S.feedLog.filter(r=>r.dir==="入库"&&+r.price>0&&!have.has("feed:"+r.id));
-  if(!missing.length){syncMsg("没有遗漏 — 所有带单价的入库都已记入收支");return}
-  if(!confirm(`发现 ${missing.length} 笔入库带单价但收支里没记账, 共 ¥${fmt(missing.reduce((a,r)=>a+r.qty*r.price,0))}。现在补记吗?`))return;
-  let n=0;
-  missing.forEach(r=>{S.finance.push({id:uid(),date:r.date,kind:"支",cat:"饲料原料",item:r.item,amount:r2(r.qty*r.price),pay:"paid",note:`自动记账 · 入库${r.qty}${r.unit||"斤"}`,src:"feed:"+r.id});n++});
+function backfillFeedFin(){ // 对账工具: 补记漏记的 + 修正金额对不上的 + 清理孤儿支出
+  let add=0,fix=0;const details=[];
+  S.feedLog.filter(r=>r.dir==="入库"&&+r.price>0).forEach(r=>{
+    const want=r2(r.qty*r.price);const fin=S.finance.find(x=>x.src==="feed:"+r.id);
+    if(!fin){S.finance.push({id:uid(),date:r.date,kind:"支",cat:"饲料原料",item:r.item,amount:want,pay:"paid",note:`自动记账 · 入库${r.qty}${r.unit||"斤"}`,src:"feed:"+r.id});add++;details.push(`补 ${r.date} ${r.item} ¥${fmt(want)}`)}
+    else if(fin.amount!==want){details.push(`修 ${fin.date} ${fin.item} ¥${fmt(fin.amount)}→¥${fmt(want)}`);fin.amount=want;fix++}
+  });
+  // 同一入库挂多笔自动支出的(历史重复bug), 只留第一笔:
+  var orph=0;
+  const seen=new Set();const dup=[];
+  S.finance.forEach(x=>{if(x.src&&x.src.startsWith("feed:")){if(seen.has(x.src))dup.push(x);else seen.add(x.src)}});
+  if(dup.length){S.finance=S.finance.filter(x=>dup.indexOf(x)<0);details.push(`清重复 ${dup.length} 笔`);orph+=dup.length}
+  const ids2=new Set(S.feedLog.map(r=>r.id));
+  S.finance.forEach(x=>{if(x.src&&x.src.startsWith("feed:")){const fid=x.src.slice(5);const r=S.feedLog.find(y=>y.id===fid);if(r&&x.amount!==r2(r.qty*r.price)&&+r.price>0&&r.dir==="入库"){x.amount=r2(r.qty*r.price)}}});
+  const ids=new Set(S.feedLog.map(r=>r.id));
+  S.finance=S.finance.filter(x=>{if(x.src&&x.src.startsWith("feed:")&&!ids.has(x.src.slice(5))){orph++;return false}return true});
+  if(!add&&!fix&&!orph){syncMsg("账是平的 — 流水与收支全部一致, 无需处理");return}
+  const msg=[add?`补记 ${add} 笔`:"", fix?`修正 ${fix} 笔金额`:"", orph?`清理孤儿支出 ${orph} 笔`:""].filter(Boolean).join(", ")+"\n"+details.slice(0,8).join("\n")+(details.length>8?"\n…":"");
+  if(!confirm(msg+"\n\n现在执行吗?"))return;
   touchSave();render();
-  syncMsg(`✅ 已补记 ${n} 笔入库支出到收支台账`)}
-
+  const parts=[];if(add)parts.push("补"+add);if(fix)parts.push("修"+fix);if(orph)parts.push("清"+orph);
+  syncMsg("✅ 对账完成: "+(parts.join("/")||"无变化"))}
 function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   const sel=f.querySelector('select[name="item"]');const c=f.querySelector('[name="item_c"]');
   const item=(sel&&sel.value==="__custom__")?(c&&c.value.trim()||""):(sel&&sel.value||""); // smartField取真名
