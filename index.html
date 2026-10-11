@@ -1144,7 +1144,17 @@ function addVax(e){e.preventDefault();const d=fd(e.target);const vid=uid();S.vac
     if(hit){S.plan.done=S.plan.done||[];const k=String(hit.cid||hit.d);if(!S.plan.done.includes(k)){S.plan.done.push(k);touchSave()}}
   }
   if(vm)syncMsg("✅ 已记防疫"+vm.slice(1));render()}
+function delRowKeepFin(id){ // 只删流水, 保留支出(转为普通手工账)
+  const fin=S.finance.find(x=>x.src==="feed:"+id);
+  if(fin){delete fin.src;fin.note=(fin.note||"")+"(流水已删, 支出保留)"}
+  S.feedLog=S.feedLog.filter(r=>r.id!==id);touchSave();render()}
 function delRow(arr,id){if(!confirm("删除这条记录?"))return;
+  if(arr==="feedLog"){ // 删入库流水时, 其自动生成的支出一并撤 (保持账实一致)
+    const rec=S.feedLog.find(r=>r.id===id);
+    const fin=S.finance.find(x=>x.src==="feed:"+id);
+    if(fin&&!confirm(`这笔入库对应一笔自动支出(¥${fmt(fin.amount)}), 一并删除吗?\n确定=两者都删, 取消=只删流水(保留支出)`))return void delRowKeepFin(id);
+    if(fin)S.finance=S.finance.filter(x=>x.src!=="feed:"+id);
+  }
   if(arr==="vaccines"){ // 删免疫流水时, 若它源自计划表, 同步撤销计划进度
     const rec=(S.vaccines||[]).find(r=>r.id===id);
     if(rec&&S.plan&&S.plan.start&&(rec.note||"").indexOf("免疫")>=0){
@@ -1153,19 +1163,32 @@ function delRow(arr,id){if(!confirm("删除这条记录?"))return;
     }
   }
   S[arr]=S[arr].filter(r=>r.id!==id);touchSave();render()}
-function editFeedRow(id){ // 出入库流水行内编辑: 库存先按旧账回冲, 存好再按新账重扣
+function editFeedRow(id){ // 出入库流水行内编辑: 库存先按旧账回冲, 存好再按新账重扣; 收支联动金额同步
   const r=S.feedLog.find(x=>x.id===id);if(!r)return;
   const ni=prompt("物料名",r.item);if(ni===null)return;const item=ni.trim();if(!item)return;
   const nd=prompt("方向: 入库 / 出库(饲喂)",r.dir);if(nd===null)return;const dir=nd.trim()||r.dir;
   const nq=prompt(`数量(${r.unit||"斤"})`,r.qty);if(nq===null)return;const qty=+nq;if(!(qty>0)){alert("数量要大于0");return}
   let unit=r.unit||"斤";
   if(unit==="包"){const nk=prompt("每包重量(kg)",(S.bagKgMap||{})[item]||bagKg());if(nk===null)return;const kg=+nk;if(!(kg>0)){alert("包重要大于0");return}rememberBagKg(item,kg)}
-  const jin=(unit==="包")?r2(qty*((S.bagKgMap||{})[item]||bagKg())*2):r2(qty*(FEED_UNITS.find(x=>x[0]===unit)||[0,1])[1]);
+  const uj=unitJinOf(item,unit)||1;
+  const jin=r2(qty*uj);
+  const np=prompt("单价(元/"+unit+"), 留空/0表示不记金额",r.price||"");if(np===null)return;const price=+np>0?+np:"";
   const oldJin=r.jin!==undefined?r.jin:(+r.qty);const wasOut=(r.dir||"").startsWith("出");
   S.feedStock[r.item]=r2((S.feedStock[r.item]||0)+(wasOut?oldJin:-oldJin)); // 回冲旧账
   const isOut=dir.startsWith("出");S.feedStock[item]=r2((S.feedStock[item]||0)+(isOut?-jin:jin)); // 记新账
-  r.item=item;r.dir=dir;r.qty=qty;r.unit=unit;r.jin=jin;
-  touchSave();syncMsg(`✅ 已改: ${r.date} ${item} ${isOut?"出":"入"}库 ${qty}${unit}(${fmt(jin)}斤)`);
+  r.item=item;r.dir=dir;r.qty=qty;r.unit=unit;r.jin=jin;r.price=price;
+  // 收支联动: 该入库对应的自动支出同步金额 (src=feed:id)
+  const src="feed:"+id;const fin=S.finance.find(x=>x.src===src);
+  if(!isOut&&price>0){
+    const amt=r2(qty*price);
+    if(fin){fin.amount=amt;fin.item=item;fin.date=r.date}
+    else S.finance.push({id:uid(),date:r.date,kind:"支",cat:"饲料原料",item,amount:amt,pay:"paid",note:`自动记账 · 入库${qty}${unit}`,src});
+  } else if(fin&&isOut){ // 变成出库: 自动支出不再成立, 撤掉
+    S.finance=S.finance.filter(x=>x.src!==src);
+  }
+  touchSave();
+  const finMsg=(!isOut&&price>0)?`; 收支已同步 ¥${fmt(r2(qty*price))}`:"";
+  syncMsg(`✅ 已改: ${r.date} ${item} ${isOut?"出":"入"}库 ${qty}${unit}(${fmt(jin)}斤)${finMsg}`);
   render()}
 function exportData(silent){const blob=new Blob([JSON.stringify(S,null,2)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=`蛋小固管家备份_${today()}.json`;if(silent)return;a.click()}
 function importData(e){const f=e.target.files[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{try{const d=JSON.parse(rd.result);if(!confirm("导入将覆盖当前数据, 继续?"))return;S=Object.assign(JSON.parse(JSON.stringify(EMPTY)),d);save();location.reload()}catch(err){alert("文件不是有效备份: "+err.message)}};rd.readAsText(f)}
