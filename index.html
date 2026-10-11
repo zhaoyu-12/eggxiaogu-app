@@ -608,7 +608,28 @@ function stockRowsHTML(){ // 库存一览: 结余按入库主单位显示, 附�
     const days=dl>0?Math.floor(st/dl*10)/10:null;
     const lamp=st<0?`<span class="tag r">透支</span>`:(days!==null&&days<=3?`<span class="tag r">仅够${days<1?"不足1":days}天</span>`:(days!==null&&days<=7?`<span class="tag w">约${days}天</span>`:(days!==null?`<span class="tag s">够${days}天</span>`:"")));
     const detail=fmt(st)+"斤"+(sub?` · ${sub}`:"")+(dl>0?` · 日耗${fmt(r2(dl))}斤`:"");
-    return `<tr><td>${k}<div style="font-size:11px;color:var(--sub)">${detail}</div></td><td class="money ${st<0?'neg':''}" style="font-size:17px">${muTxt}</td><td>${lamp}</td></tr>`}).join("")+`</table>`}
+    return `<tr><td><a href="javascript:void(0)" onclick="auditItem('${k}')" style="color:inherit;text-decoration:underline dotted">${k}</a><div style="font-size:11px;color:var(--sub)">${detail}</div></td><td class="money ${st<0?'neg':''}" style="font-size:17px">${muTxt}</td><td>${lamp}</td></tr>`}).join("")+`</table>`}
+function auditItem(item){ // 物料对账: 流水汇总 vs 当前库存, 差额一眼可见
+  const rows=S.feedLog.filter(r=>r.item===item);
+  const jin=r=>r2(+r.jin||0);
+  const inR=rows.filter(r=>!(r.dir||"").startsWith("出"));
+  const outR=rows.filter(r=>(r.dir||"").startsWith("出"));
+  const outAuto=outR.filter(r=>r.auto);
+  const sum=a=>r2(a.reduce((x,r)=>x+jin(r),0));
+  const tin=sum(inR),tout=sum(outR),tauto=sum(outAuto);
+  const calc=r2(tin-tout);
+  const lines=[
+    `入库 ${inR.length} 笔: +${fmt(tin)}斤`,
+    outAuto.length?`配方自动消耗 ${outAuto.length} 笔: -${fmt(tauto)}斤`:"",
+    (outR.length-outAuto.length)?`手动出库 ${outR.length-outAuto.length} 笔: -${fmt(r2(tout-tauto))}斤`:"",
+    `──────`,
+    `流水合计: ${fmt(calc)}斤 (入${fmt(tin)} - 出${fmt(tout)})`,
+    `当前库存: ${fmt(S.feedStock[item]||0)}斤`,
+    calc!==(S.feedStock[item]||0)?`⚠ 差额 ${fmt(r2(calc-(S.feedStock[item]||0)))}斤 — 库存与流水对不上, 请重开App让它重算; 若仍有差额, 截图发给兹白`:((S.feedStock[item]||0)>=0?"✓ 账是平的":`✓ 账是平的 — 负数=消耗>入库, 确实该补货了 (缺 ${fmt(-(S.feedStock[item]||0))}斤)`)
+  ].filter(Boolean);
+  const byDay={};inR.forEach(r=>{byDay[r.date]=(byDay[r.date]||0)+jin(r)});
+  const inList=Object.keys(byDay).sort().map(d=>`  ${d} 入 ${fmt(byDay[d])}斤`).join("\n")||"  (无入库记录!)";
+  alert(`【${item}】对账\n\n${lines.join("\n")}\n\n入库明细:\n${inList}${outR.length?`\n\n出库明细:\n${outR.slice().sort((a,b)=>a.date<b.date?-1:1).map(r=>`  ${r.date} 出 ${fmt(jin(r))}斤${r.auto?"(配方)":"(手动)"}`).join("\n")}`:""}`)}
 function foldState(key){window.FOLD_TAB=window.FOLD_TAB||{};if(window.FOLD_TAB[key]===undefined)window.FOLD_TAB[key]=0;return window.FOLD_TAB[key]}
 function foldToggle(key){window.FOLD_TAB=window.FOLD_TAB||{};window.FOLD_TAB[key]=(window.FOLD_TAB[key]?0:1);render()}
 function foldRows(list,dateKey,rowFn,sumFn,hintText){ // 通用按日折叠: list已按日期倒序; 返回html(不含table外壳)
