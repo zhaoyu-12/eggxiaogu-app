@@ -284,7 +284,12 @@ function mainUnitOf(item){ // 物料的主单位: 最近一次入库用的单位
   return (r&&r.unit)||"斤"}
 function bagKgOf(item){const m=(S.bagKgMap||{})[item];return (+m>0)?+m:bagKg()} // 物料自己的包重优先
 function rememberBagKg(item,kg){if(!item||!(kg>0))return;S.bagKgMap=S.bagKgMap||{};S.bagKgMap[item]=kg}
-function unitOptsHTML(){return unitDefs().map(u=>`<option value="${u[0]}">${u[0]}</option>`).join('')+'<option value="__newunit__">➕ 新建单位…</option>'}
+function unitOptsHTML(){ // 基础单位 + 包 + 记忆单位(unitKg里出现过的) + 新建
+  const base=unitDefs();
+  const mem=new Set();const U=S.unitKg||{};Object.keys(U).forEach(it=>Object.keys(U[it]).forEach(u=>{if(u&&u!=="undefined")mem.add(u)}));
+  (S.units||[]).forEach(u=>mem.add(u.name));
+  const all=base.map(u=>u[0]).concat([].concat([...mem]).filter(u=>!base.some(b=>b[0]===u)));
+  return all.map(u=>`<option value="${u}">${u}</option>`).join('')+'<option value="__newunit__">➕ 新建单位…</option>'}
 function feedUnitUI(sel){
   const f=sel.closest("form");if(!f)return;
   const bag=f.querySelector("#bagkg_field");const uk=f.querySelector("#unitkg_field");
@@ -509,6 +514,7 @@ function vFlock(){
     <div class="field"><label>类型</label><select name="type"><option>进雏/上鸡</option><option>死淘</option><option>淘汰鸡出售</option><option>转入</option><option>转出</option></select></div>
     <div class="field"><label>鸡舍/批次</label><input name="house" list="houselist" placeholder="1号舍" required>${datalistTag("houselist",houseList())}</div>
     <div class="field"><label>数量(+进/-出)</label><input type="number" name="qty" placeholder="死淘填负数" required></div>
+    <div class="field"><label>金额(元, 选填: 进雏支出/卖鸡收入, 填了自动记收支)</label><input type="number" step="0.01" name="amount" placeholder="选填"></div>
     <div class="field"><label>备注</label>${noteField('flock')}</div>
     <button class="go">登记</button>
   </form>
@@ -554,7 +560,21 @@ function vFeed(){
     <button class="go">保存配方</button>
   </form>
   <div class="hint">各行填「品种+数量」, 「斤/单位」留空则按该物料入库时记的重量(包重/桶重), 全部填好自动算总耗料和占比。「⚖️按包数折算」可手动刷新。每天消耗=总耗料×各行占比, 自动出库(打开App时补记, 最多补7天), 只记有鸡的日子。存栏变了直接改各行的数量就行。</div></section>`;
-  return recipeHtml+`<section class="panel"><h2>📦 库存一览</h2>
+  return recipeHtml+`  <section class="panel"><h2>➕ 物料出入库</h2>
+  <form onsubmit="addFeed(event)">
+    <div class="field"><label>日期</label><input type="date" name="date" value="${today()}" required></div>
+    <div class="field"><label>物料名</label>${smartField('item',FEED_ITEMS.concat(S.customFeed||[]),'')}</div>
+    <div class="field"><label>方向</label><select name="dir"><option>入库</option><option>出库(饲喂)</option></select></div>
+    <div class="field"><label>数量</label><input type="number" step="0.01" name="qty" required></div>
+    <div class="field"><label>单位</label><select name="unit" onchange="feedUnitUI(this)">${unitOptsHTML()}</select></div>
+    <div class="field" id="bagkg_field" style="display:none"><label>每包重量(kg)</label><input type="number" step="0.1" min="0.1" name="bagkg" id="feed_bagkg" value="${bagKg()}" placeholder="玉米50/豆粕40各记各的"></div>
+    <div class="field" id="unitkg_field" style="display:none"><label>每单位重量(kg)</label><input type="number" step="0.1" min="0.1" name="unitkg" placeholder="如: 一桶40kg"></div>
+    <div class="field"><label id="price_label">单价(元/斤)</label><input type="number" step="0.01" name="price"></div>
+    <div class="field"><label>备注</label>${noteField('feed')}</div>
+    <button class="go">记账</button>
+  </form>
+  <div class="hint">入库自动加库存; 填了单价自动记支出到收支台账。出库用于纠错(饲喂消耗由配方自动记)。</div></section>
+  <section class="panel"><h2>📦 库存一览</h2>
     ${ia.length?ia.map(a=>`<div style="margin:4px 0"><span class="tag ${a.lvl}">${a.lvl==="r"?"🔴 急补":"🟡 该进料"}</span> ${a.txt}</div>`).join(""):""}
     ${stockRowsHTML()}
     <div class="hint">结余按你入库时的记法显示(包/桶/袋); 黄牌=够吃7天内, 红牌=3天内。账本内部按斤累计, 流水可核每笔。</div></section>
@@ -1077,7 +1097,9 @@ function addFeed(e){e.preventDefault();const d=fd(e.target);const f=e.target;
   const sel=f.querySelector('select[name="item"]');const c=f.querySelector('[name="item_c"]');
   const item=(sel&&sel.value==="__custom__")?(c&&c.value.trim()||""):(sel&&sel.value||""); // smartField取真名
   if(!item){alert("请填写物料名");return}
+  if(sel&&sel.value==="__custom__"&&item){S.customFeed=S.customFeed||[];if(!S.customFeed.includes(item)&&!FEED_ITEMS.includes(item)){S.customFeed.push(item);save()}}
   const qty=+d.qty;if(!(qty>0)){alert("数量要大于0");return}
+  if(!d.unit||d.unit==="undefined"){alert("单位无效, 请重新选择单位");return}
   let jin=0;let kgo=0;
   if(d.unit==="包"){kgo=+d.bagkg>0?+d.bagkg:bagKgOf(item);if(!(kgo>0)){alert("请填写每包重量");return}jin=r2(qty*kgo*2);rememberBagKg(item,kgo)}
   else if(unitIsCustom(d.unit)){const uk=+d.unitkg;if(!(uk>0)){alert(`请填写每${d.unit}重量(kg)`);return}jin=r2(qty*uk*2);rememberUnitKg(item,d.unit,uk)}
@@ -1107,7 +1129,7 @@ function addVax(e){e.preventDefault();const d=fd(e.target);const vid=uid();S.vac
     const hit=planAll().find(it=>it.name===d.name.trim()&&addDays(S.plan.start,it.d)===d.date);
     if(hit){S.plan.done=S.plan.done||[];const k=String(hit.cid||hit.d);if(!S.plan.done.includes(k)){S.plan.done.push(k);touchSave()}}
   }
-  render()}
+  if(vm)syncMsg("✅ 已记防疫"+vm.slice(1));render()}
 function delRow(arr,id){if(!confirm("删除这条记录?"))return;
   if(arr==="vaccines"){ // 删免疫流水时, 若它源自计划表, 同步撤销计划进度
     const rec=(S.vaccines||[]).find(r=>r.id===id);
