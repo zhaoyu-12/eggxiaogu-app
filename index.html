@@ -303,9 +303,9 @@ function feedUnitUI(sel){
   }
   const v=sel.value;
   if(bag)bag.style.display=v==="包"?"":"none";
-  if(uk)uk.style.display=(v==="包"||unitIsCustom(v))?"":"none";
+  if(uk)uk.style.display=unitIsCustom(v)?"":"none"; // "包"有专属的"每包重量", 通用字段只给自定义单位(桶/袋等)
   const lb=f.querySelector("#price_label");if(lb)lb.textContent="单价(元/"+v+")";
-  const ukIn=f.querySelector('[name="unitkg"]');if(ukIn)ukIn.placeholder=v==="包"?"每包重量(kg)":"每"+v+"重量(kg)";
+  const ukIn=f.querySelector('[name="unitkg"]');if(ukIn)ukIn.placeholder="每"+v+"重量(kg)";
   const selItem=f.querySelector('select[name="item"]');if(selItem)feedItemTipFromForm(selItem)}
 function feedItemTipFromForm(sel){const f=sel.closest("form");const c=f.querySelector('[name="item_c"]');const v=sel.value==="__custom__"?(c&&c.value.trim()||""):sel.value;const m=(S.bagKgMap||{})[v];const el=f.querySelector("#feed_bagkg");if(m>0&&el)el.value=m} // 选物料自动带出记忆包重
 function monthSum(list,dateKey,amtFn,m){return list.filter(r=>monthOf(r[dateKey])===m).reduce((a,r)=>a+(amtFn?amtFn(r):r.amount),0)}
