@@ -1,5 +1,5 @@
 ;;; BZPL.lsp - 闭合多段线外侧对齐标注 最终版
-;;; 功能: ①自动新建标注图层(可命名) ②文字方向可选(随线/水平) ③标注位置可选内侧/外侧(逐段判定, 凹多边形正确) ④文字居中嵌入尺寸线(线断开式样) ⑤全中文提示
+;;; 功能: ①自动新建标注图层(可命名) ②文字方向可选(随线/水平) ③标注位置可选内侧/外侧(逐段判定, 凹多边形正确) ④文字位置实体级归位(随线=卡中/水平=统一上方) ⑤全中文提示
 ;;; 命令: BZPL   (GBK编码, CAD2014/天正直接加载)
 (defun get-verts8 (ent / elist pts v)
   (setq elist (entget ent))
@@ -41,7 +41,7 @@
   )
   c
 )
-(defun c:BZPL ( / ent verts n i p1 p2 mid ang pt3 h layans layname oldtih oldtoh dirans side invar oldtad)
+(defun c:BZPL ( / ent verts n i p1 p2 mid ang pt3 h layans layname oldtih oldtoh dirans side invar oldtad lastdim)
   (setq ent (car (entsel "\n请选择闭合多段线: ")))
   (if (null ent) (progn (princ "\n未选中对象, 退出。") (exit)))
   (setq verts (get-verts8 ent))
@@ -75,7 +75,10 @@
   (setq dirans (getkword "\n文字方向[随线段(A)/全部水平(H)] <A>: "))
   (if (null dirans) (setq dirans "A"))
   (setq oldtih (getvar "DIMTIH") oldtoh (getvar "DIMTOH") oldtad (getvar "DIMTAD"))
-  (setvar "DIMTAD" 0)
+  (if (= dirans "H")
+    (setvar "DIMTAD" 1)
+    (setvar "DIMTAD" 0)
+  )
   (if (= dirans "H")
     (progn (setvar "DIMTIH" 1) (setvar "DIMTOH" 1))
     (progn (setvar "DIMTIH" 0) (setvar "DIMTOH" 0))
@@ -99,6 +102,8 @@
              (setq pt3 (polar mid ang h)))
     )
     (command "_.DIMALIGNED" "_non" p1 "_non" p2 "_non" pt3)
+    (setq lastdim (entlast))
+    (command "_.DIMTEDIT" lastdim "_H")
     (setq i (1+ i))
   )
   (setvar "DIMTIH" oldtih)
